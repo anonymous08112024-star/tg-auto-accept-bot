@@ -3,104 +3,172 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Channel Settings Dashboard</title>
-  <!-- Telegram WebApp SDK -->
+  <title>Bot Hub & Control Center</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body {
-      background-color: var(--tg-theme-bg-color, #0f172a);
+      background-color: var(--tg-theme-bg-color, #0b1120);
       color: var(--tg-theme-text-color, #f8fafc);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
   </style>
 </head>
-<body class="p-4 pb-12 max-w-lg mx-auto">
+<body class="p-4 pb-14 max-w-lg mx-auto">
 
   <!-- Header -->
-  <div class="flex items-center justify-between pb-4 border-b border-slate-700 mb-6">
+  <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
     <div>
-      <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-        <span>⚡</span> Channel Hub
+      <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+        <span>⚡</span> Control Center
       </h1>
-      <p class="text-xs text-slate-400">Configure welcome greeting & links</p>
+      <p class="text-xs text-slate-400">Telegram Auto-Accept Engine</p>
     </div>
-    <span id="userBadge" class="text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full font-medium">
-      Admin
-    </span>
+    <div class="flex items-center gap-2">
+      <span id="roleBadge" class="text-[11px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full font-medium">
+        Admin
+      </span>
+    </div>
+  </div>
+
+  <!-- Role-Based Navigation (Visible only to Owner) -->
+  <div id="ownerNav" class="hidden grid grid-cols-2 gap-2 bg-slate-900/80 p-1 rounded-xl border border-slate-800 mb-5">
+    <button id="tabChannelBtn" class="py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white transition-all">
+      📢 Channel Hub
+    </button>
+    <button id="tabOwnerBtn" class="py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">
+      👑 Owner HQ
+    </button>
   </div>
 
   <!-- Loading State -->
   <div id="loading" class="py-12 text-center text-slate-400 text-sm">
     <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-3"></div>
-    <p>Loading your connected channels...</p>
+    <p>Loading channel configurations...</p>
   </div>
 
-  <!-- No Channels State -->
-  <div id="noChannels" class="hidden bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6 text-center">
-    <div class="text-3xl mb-2">📢</div>
-    <h3 class="text-base font-semibold text-white mb-1">No Channels Found</h3>
-    <p class="text-xs text-slate-400 leading-relaxed">
-      Make sure this bot is added as an <b>Administrator</b> with <i>Invite Users</i> rights in your channel.
-    </p>
-  </div>
-
-  <!-- Main Settings Form -->
-  <div id="settingsForm" class="hidden space-y-6">
+  <!-- ========================================== -->
+  <!-- TAB 1: REGULAR CHANNEL ADMIN SETTINGS      -->
+  <!-- ========================================== -->
+  <div id="channelSection" class="hidden space-y-5">
     
-    <!-- Channel Selector -->
-    <div>
-      <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Select Channel</label>
-      <select id="channelSelect" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500">
-      </select>
+    <!-- No Channels State -->
+    <div id="noChannels" class="hidden bg-slate-900/60 border border-slate-800 rounded-2xl p-6 text-center">
+      <div class="text-3xl mb-2">📢</div>
+      <h3 class="text-sm font-semibold text-white mb-1">No Channels Connected</h3>
+      <p class="text-xs text-slate-400 leading-relaxed">
+        Add this bot as an <b>Administrator</b> with <i>Invite Users</i> rights in your channel to begin.
+      </p>
     </div>
 
-    <!-- Live Preview Box -->
-    <div>
-      <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Live DM Preview</label>
-      <div class="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-4 shadow-xl">
-        <div class="text-xs text-slate-400 mb-2 font-medium">Preview (What users receive):</div>
-        <div class="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50 space-y-3">
-          <p class="text-xs font-semibold text-blue-400" id="previewTitle">🎉 Request Approved for [Channel]!</p>
-          <p class="text-xs text-slate-200 whitespace-pre-line leading-relaxed" id="previewMessage">Welcome to the channel! Check out our pinned posts.</p>
-          
-          <div class="pt-2 border-t border-slate-700/60 space-y-2">
-            <button id="previewCustomBtn" class="w-full py-2 px-3 text-xs font-medium text-center bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors">
-              Official Channel
-            </button>
-            <button disabled class="w-full py-2 px-3 text-xs font-medium text-center bg-slate-700/80 text-slate-300 rounded-lg opacity-80 cursor-not-allowed">
-              🔥 Explore Bold Cinema
-            </button>
-          </div>
-          <p class="text-[10px] text-slate-500 text-center">⚡ Powered by Auto-Accept Network</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Editor Fields -->
-    <div class="space-y-4">
+    <div id="channelForm" class="space-y-5 hidden">
+      <!-- Channel Selector -->
       <div>
-        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Welcome Message</label>
-        <textarea id="customMessage" rows="3" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 leading-relaxed" placeholder="Enter custom greeting for approved users..."></textarea>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Select Channel</label>
+        <select id="channelSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+        </select>
       </div>
 
-      <div class="grid grid-cols-1 gap-3">
-        <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Custom Button Title</label>
-          <input type="text" id="btnText" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="e.g. Join Discussion Group">
+      <!-- Live DM Preview Box -->
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Live DM Preview</label>
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 shadow-xl">
+          <div class="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50 space-y-2.5">
+            <p class="text-xs font-semibold text-blue-400" id="previewTitle">🎉 Request Approved!</p>
+            <p class="text-xs text-slate-200 whitespace-pre-line leading-relaxed" id="previewMessage">Welcome to the channel!</p>
+            
+            <div class="pt-2 border-t border-slate-700/60 space-y-1.5">
+              <button id="previewCustomBtn" class="w-full py-2 px-3 text-xs font-medium text-center bg-blue-600 text-white rounded-lg pointer-events-none">
+                Official Channel
+              </button>
+              <button disabled class="w-full py-2 px-3 text-xs font-medium text-center bg-slate-700/80 text-slate-300 rounded-lg opacity-80 cursor-not-allowed">
+                🔥 Explore Bold Cinema
+              </button>
+            </div>
+            <p class="text-[10px] text-slate-500 text-center">⚡ Powered by Auto-Accept Network</p>
+          </div>
         </div>
+      </div>
+
+      <!-- Customization Inputs -->
+      <div class="space-y-3.5">
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Custom Button Link (URL)</label>
-          <input type="url" id="btnUrl" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="https://t.me/your_group">
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Welcome Message</label>
+          <textarea id="customMessage" rows="3" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 leading-relaxed"></textarea>
         </div>
+
+        <div class="grid grid-cols-1 gap-2.5">
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Custom Button Title</label>
+            <input type="text" id="btnText" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="e.g. Join Discussion Group">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Custom Button Link (URL)</label>
+            <input type="url" id="btnUrl" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="https://t.me/your_link">
+          </div>
+        </div>
+      </div>
+
+      <button id="saveBtn" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all shadow-lg shadow-blue-600/20 active:scale-[0.99]">
+        Save Channel Configuration
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- TAB 2: OWNER HQ (RESTRICTED TO OWNER_ID)   -->
+  <!-- ========================================== -->
+  <div id="ownerSection" class="hidden space-y-6">
+    
+    <!-- Telemetry Metric Cards -->
+    <div class="grid grid-cols-2 gap-3">
+      <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
+        <p class="text-[11px] font-medium text-slate-400">Total Network Joins</p>
+        <p class="text-xl font-bold text-white mt-1" id="mTotalJoins">0</p>
+        <span class="text-[10px] text-emerald-400 font-medium">All-time processed</span>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
+        <p class="text-[11px] font-medium text-slate-400">Joins (Last 24h)</p>
+        <p class="text-xl font-bold text-blue-400 mt-1" id="m24hJoins">0</p>
+        <span class="text-[10px] text-blue-300 font-medium">Daily velocity</span>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
+        <p class="text-[11px] font-medium text-slate-400">Connected Channels</p>
+        <p class="text-xl font-bold text-white mt-1" id="mTotalChannels">0</p>
+        <span class="text-[10px] text-slate-400" id="mActiveChannels">0 active</span>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
+        <p class="text-[11px] font-medium text-slate-400">Promo Target</p>
+        <p class="text-sm font-bold text-amber-400 mt-1 truncate" id="mPromoName">Bold Cinema</p>
+        <span class="text-[10px] text-emerald-400 font-medium">100% Active in DMs</span>
       </div>
     </div>
 
-    <!-- Action Button -->
-    <button id="saveBtn" class="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white font-semibold rounded-xl text-sm transition-all shadow-lg shadow-blue-600/20">
-      Save Configuration
-    </button>
+    <!-- Master Channels Directory -->
+    <div>
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Master Channel Network</h3>
+        <span class="text-[11px] text-slate-500" id="channelCountLabel">0 Channels</span>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800 max-h-60 overflow-y-auto" id="masterChannelList">
+      </div>
+    </div>
+
+    <!-- Announcement / Broadcast Engine -->
+    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3">
+      <div class="flex items-center gap-2">
+        <span class="text-base">📢</span>
+        <div>
+          <h3 class="text-xs font-semibold text-white">Broadcast to Channel Admins</h3>
+          <p class="text-[10px] text-slate-400">Delivers a private message directly to all connected channel admins</p>
+        </div>
+      </div>
+      <textarea id="broadcastInput" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="Type administrative announcement or update..."></textarea>
+      <button id="sendBroadcastBtn" class="w-full py-2.5 px-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
+        Dispatch Broadcast
+      </button>
+    </div>
+
   </div>
 
   <script>
@@ -111,17 +179,20 @@
       tg.ready();
     }
 
-    // Identify user
-    const user = tg?.initDataUnsafe?.user || { id: 5527067319, first_name: "Admin" };
-    document.getElementById("userBadge").innerText = user.first_name || "Admin";
+    const user = tg?.initDataUnsafe?.user || { id: 5527067319, first_name: "Surendra" };
 
-    let channels = [];
-    let currentChannel = null;
-
-    // Elements
+    // DOM Elements
+    const roleBadge = document.getElementById("roleBadge");
+    const ownerNav = document.getElementById("ownerNav");
+    const tabChannelBtn = document.getElementById("tabChannelBtn");
+    const tabOwnerBtn = document.getElementById("tabOwnerBtn");
+    const channelSection = document.getElementById("channelSection");
+    const ownerSection = document.getElementById("ownerSection");
     const loading = document.getElementById("loading");
+
+    // Channel Form DOM Elements
     const noChannels = document.getElementById("noChannels");
-    const settingsForm = document.getElementById("settingsForm");
+    const channelForm = document.getElementById("channelForm");
     const channelSelect = document.getElementById("channelSelect");
     const customMessage = document.getElementById("customMessage");
     const btnText = document.getElementById("btnText");
@@ -131,27 +202,54 @@
     const previewCustomBtn = document.getElementById("previewCustomBtn");
     const saveBtn = document.getElementById("saveBtn");
 
-    async function fetchChannels() {
+    // Owner Elements
+    const mTotalJoins = document.getElementById("mTotalJoins");
+    const m24hJoins = document.getElementById("m24hJoins");
+    const mTotalChannels = document.getElementById("mTotalChannels");
+    const mActiveChannels = document.getElementById("mActiveChannels");
+    const mPromoName = document.getElementById("mPromoName");
+    const masterChannelList = document.getElementById("masterChannelList");
+    const channelCountLabel = document.getElementById("channelCountLabel");
+    const broadcastInput = document.getElementById("broadcastInput");
+    const sendBroadcastBtn = document.getElementById("sendBroadcastBtn");
+
+    let isOwner = false;
+    let myChannels = [];
+    let currentChannel = null;
+
+    async function init() {
       try {
         const res = await fetch(`${BACKEND_URL}/api/channels/${user.id}`);
         const data = await res.json();
 
         loading.classList.add("hidden");
+        channelSection.classList.remove("hidden");
+
+        if (data.is_owner) {
+          isOwner = true;
+          roleBadge.innerText = "👑 Master Owner";
+          roleBadge.className = "text-[11px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-full font-semibold";
+          ownerNav.classList.remove("hidden");
+          loadOwnerDashboard();
+        } else {
+          roleBadge.innerText = user.first_name || "Admin";
+        }
+
         if (data.success && data.channels.length > 0) {
-          channels = data.channels;
-          channelSelect.innerHTML = channels.map(c => `<option value="${c.chat_id}">${c.chat_title}</option>`).join("");
-          settingsForm.classList.remove("hidden");
-          selectChannel(channels[0].chat_id);
+          myChannels = data.channels;
+          channelSelect.innerHTML = myChannels.map(c => `<option value="${c.chat_id}">${c.chat_title}</option>`).join("");
+          channelForm.classList.remove("hidden");
+          selectChannel(myChannels[0].chat_id);
         } else {
           noChannels.classList.remove("hidden");
         }
       } catch (err) {
-        loading.innerHTML = `<p class="text-rose-400">Failed to load channels. Please retry.</p>`;
+        loading.innerHTML = `<p class="text-rose-400 text-xs">Failed to connect to backend server.</p>`;
       }
     }
 
     function selectChannel(chatId) {
-      currentChannel = channels.find(c => String(c.chat_id) === String(chatId));
+      currentChannel = myChannels.find(c => String(c.chat_id) === String(chatId));
       if (!currentChannel) return;
 
       customMessage.value = currentChannel.custom_message || "Welcome to the channel! Check out our pinned posts.";
@@ -172,13 +270,12 @@
       }
     }
 
-    // Dynamic live updating
     customMessage.addEventListener("input", updatePreview);
     btnText.addEventListener("input", updatePreview);
     btnUrl.addEventListener("input", updatePreview);
     channelSelect.addEventListener("change", (e) => selectChannel(e.target.value));
 
-    // Save configuration
+    // Save channel configuration
     saveBtn.addEventListener("click", async () => {
       if (!currentChannel) return;
       saveBtn.disabled = true;
@@ -199,25 +296,119 @@
           body: JSON.stringify(payload)
         });
         const result = await res.json();
-
         if (result.success) {
           currentChannel.custom_message = payload.custom_message;
           currentChannel.custom_btn_text = payload.custom_btn_text;
           currentChannel.custom_btn_url = payload.custom_btn_url;
           tg?.HapticFeedback?.notificationOccurred("success");
-          alert("Settings updated successfully!");
+          alert("Channel configuration updated successfully!");
         } else {
           alert("Error: " + (result.error || "Could not save."));
         }
-      } catch (err) {
-        alert("Network error while saving.");
+      } catch (e) {
+        alert("Network communication error.");
       } finally {
         saveBtn.disabled = false;
-        saveBtn.innerText = "Save Configuration";
+        saveBtn.innerText = "Save Channel Configuration";
       }
     });
 
-    fetchChannels();
+    // Tab Navigation
+    tabChannelBtn.addEventListener("click", () => {
+      tabChannelBtn.className = "py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white transition-all";
+      tabOwnerBtn.className = "py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
+      channelSection.classList.remove("hidden");
+      ownerSection.classList.add("hidden");
+    });
+
+    tabOwnerBtn.addEventListener("click", () => {
+      tabOwnerBtn.className = "py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white transition-all";
+      tabChannelBtn.className = "py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
+      channelSection.classList.add("hidden");
+      ownerSection.classList.remove("hidden");
+    });
+
+    // Load Owner Data
+    async function loadOwnerDashboard() {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/data/${user.id}`);
+        const data = await res.json();
+        if (!data.success) return;
+
+        mTotalJoins.innerText = (data.metrics.total_joins || 0).toLocaleString();
+        m24hJoins.innerText = "+" + (data.metrics.joins_24h || 0).toLocaleString();
+        mTotalChannels.innerText = data.metrics.total_channels || 0;
+        mActiveChannels.innerText = `${data.metrics.active_channels || 0} active`;
+        mPromoName.innerText = data.metrics.promo_name || "Bold Cinema";
+        channelCountLabel.innerText = `${data.channels.length} Channels`;
+
+        // Render Master Channel Directory
+        masterChannelList.innerHTML = data.channels.map(ch => `
+          <div class="p-3 flex items-center justify-between gap-3 text-xs">
+            <div class="truncate">
+              <p class="font-semibold text-white truncate">${ch.chat_title}</p>
+              <p class="text-[10px] text-slate-400">ID: ${ch.chat_id} • Joins: <span class="text-blue-400 font-medium">${ch.total_joins}</span></p>
+            </div>
+            <button onclick="toggleChannel(${ch.chat_id}, ${!ch.is_active})" class="shrink-0 text-[10px] px-2.5 py-1 rounded-lg font-medium border ${ch.is_active ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' : 'border-rose-500/30 text-rose-400 bg-rose-500/10'}">
+              ${ch.is_active ? 'Active' : 'Paused'}
+            </button>
+          </div>
+        `).join("");
+      } catch (err) {
+        console.error("Owner load error:", err);
+      }
+    }
+
+    // Toggle Channel Active/Paused
+    window.toggleChannel = async function(chatId, newStatus) {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/toggle-channel`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ admin_id: user.id, chat_id: chatId, is_active: newStatus })
+        });
+        const result = await res.json();
+        if (result.success) {
+          loadOwnerDashboard();
+        }
+      } catch (err) {
+        alert("Failed to toggle status.");
+      }
+    };
+
+    // Send Broadcast Announcement
+    sendBroadcastBtn.addEventListener("click", async () => {
+      const msg = broadcastInput.value.trim();
+      if (!msg) {
+        alert("Please enter a message to broadcast.");
+        return;
+      }
+
+      sendBroadcastBtn.disabled = true;
+      sendBroadcastBtn.innerText = "Dispatching broadcast...";
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/broadcast`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ admin_id: user.id, message: msg })
+        });
+        const result = await res.json();
+        if (result.success) {
+          alert(`Broadcast delivered to ${result.delivered} / ${result.total_admins} channel admins.`);
+          broadcastInput.value = "";
+        } else {
+          alert("Error: " + (result.error || "Broadcast failed."));
+        }
+      } catch (err) {
+        alert("Broadcast communication error.");
+      } finally {
+        sendBroadcastBtn.disabled = false;
+        sendBroadcastBtn.innerText = "Dispatch Broadcast";
+      }
+    });
+
+    init();
   </script>
 </body>
 </html>
