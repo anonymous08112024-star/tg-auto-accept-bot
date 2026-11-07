@@ -1,9 +1,11 @@
 import os
 import logging
 import random
+import asyncio
+from collections import Counter
 from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,15 +44,33 @@ OWNER_ID = int(os.getenv("OWNER_ID", "5527067319"))
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://tg-accept-dash.pages.dev")
 BOT_USERNAME = os.getenv("BOT_USERNAME", "AutoRequestAcceptorxBot")
 
-# Initialize Supabase Client
+# Initialize Supabase Client & Telegram App
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# Initialize Telegram Application
 tg_app = Application.builder().token(TOKEN).build()
+
+# FloodGuard Async Queue & Flood Tracker
+floodguard_queue: asyncio.Queue = asyncio.Queue()
+user_burst_tracker: Dict[int, List[float]] = {}
 
 
 # ==========================================================
-# HELPER FUNCTIONS: TEMPLATING & PROMO ROTATION
+# FLOODGUARD PACING WORKER
+# ==========================================================
+async def floodguard_worker():
+    """Processes outbound deliveries at a calibrated rate (max 25 req/sec)."""
+    while True:
+        task = await floodguard_queue.get()
+        try:
+            await task()
+        except Exception as e:
+            logger.warning(f"FloodGuard execution error: {e}")
+        finally:
+            floodguard_queue.task_done()
+        await asyncio.sleep(0.04)  # 40ms interval enforces ~25 calls/sec ceiling
+
+
+# ==========================================================
+# TEMPLATING & PROMO ROTATION HELPERS
 # ==========================================================
 def render_template(template_str: str, user, chat_title: str) -> str:
     """Replaces dynamic variables: {name}, {channel}, {username}, {time}."""
@@ -106,14 +126,24 @@ def construct_keyboard(config: dict, promo_btn: Optional[InlineKeyboardButton]) 
     return InlineKeyboardMarkup(rows)
 
 
+def is_flood_abusive(user_id: int) -> bool:
+    """Detects rapid script-based join request spam from identical user IDs."""
+    now = asyncio.get_event_loop().time()
+    timestamps = user_burst_tracker.get(user_id, [])
+    timestamps = [t for t in timestamps if now - t < 5.0]
+    timestamps.append(now)
+    user_burst_tracker[user_id] = timestamps
+    return len(timestamps) > 8
+
+
 # ==========================================================
 # 1. CHANNEL ONBOARDING & MAGIC INVITE GENERATOR
 # ==========================================================
 async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Detects bot promotion/demotion and auto-creates an approval link."""
     chat_member_update = update.my_chat_member
     chat = chat_member_update.chat
-    new_status = chat_member_update.new_chat_member.status
+    new_member = chat_member_update.new_chat_member
+    new_status = new_member.status
     admin_user = chat_member_update.from_user
 
     if new_status in [ChatMember.ADMINISTRATOR, "administrator"]:
@@ -143,12 +173,12 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
 
             link_msg = (
                 f"\n\n🔗 **Your Magic Auto-Approval Link:**\n`{magic_link}`\n"
-                f"_(Use this in your ads—requests to join will be accepted instantly 24/7)_"
+                f"_(Use this link in your ad campaigns for instant 24/7 approvals)_"
             ) if magic_link else ""
 
             welcome_admin_text = (
                 f"✅ **Auto-Approval Engine Activated for {chat.title}!**\n\n"
-                f"• All join requests will now be accepted in real time."
+                f"• All join requests will now be accepted instantly."
                 f"{link_msg}\n\n"
                 f"👉 Use `/settings` to upload a photo banner, edit buttons, or toggle event mode."
             )
@@ -165,10 +195,9 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 # ==========================================================
-# 2. AUTO-ACCEPTANCE & DM DISPATCH ENGINE
+# 2. AUTO-ACCEPTANCE & ANTI-BOT ENGINE
 # ==========================================================
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Approves requests instantly, logs joins, and dispatches custom cards."""
     join_request = update.chat_join_request
     chat = join_request.chat
     user = join_request.from_user
@@ -176,6 +205,20 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     link_name = invite_link.name if invite_link and invite_link.name else "Direct / Unknown"
     link_url = invite_link.invite_link if invite_link else None
+
+    # Anti-Bot Filter 1: Check Blacklist
+    try:
+        bl_check = supabase.table("network_blacklist").select("entity_id").eq("entity_id", user.id).maybe_single().execute()
+        if bl_check and bl_check.data:
+            logger.warning(f"Blocked blacklisted user {user.id} from joining {chat.id}")
+            return
+    except Exception:
+        pass
+
+    # Anti-Bot Filter 2: Check Bot Entity & Pattern Floods
+    if getattr(user, "is_bot", False) or is_flood_abusive(user.id):
+        logger.warning(f"Rejected automated entity/flooder {user.id} in {chat.id}")
+        return
 
     # Step A: Instant Approval
     try:
@@ -205,7 +248,10 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.warning(f"Failed to fetch config for chat {chat.id}: {e}")
         config = {}
 
-    # Check Event Mode vs Regular Message
+    if not config.get("is_active", True):
+        return
+
+    # Check Event Mode
     if config.get("event_mode_enabled") and config.get("event_message"):
         raw_msg = config.get("event_message")
     else:
@@ -224,35 +270,37 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     banner_file_id = config.get("banner_file_id")
     silent_dm = config.get("silent_dm", False)
 
-    # Step D: Dispatch DM (Photo Card or Text Card)
-    try:
-        if banner_file_id:
-            await context.bot.send_photo(
-                chat_id=user.id,
-                photo=banner_file_id,
-                caption=card_text,
-                parse_mode="Markdown",
-                reply_markup=keyboard,
-                disable_notification=silent_dm
-            )
-        else:
-            await context.bot.send_message(
-                chat_id=user.id,
-                text=card_text,
-                parse_mode="Markdown",
-                reply_markup=keyboard,
-                disable_notification=silent_dm,
-                disable_web_page_preview=True
-            )
-    except Exception as e:
-        logger.warning(f"Could not deliver DM to user {user.id} (privacy/blocked): {e}")
+    # Step D: Route to FloodGuard Pacing Queue
+    async def dispatch_approval_dm():
+        try:
+            if banner_file_id:
+                await context.bot.send_photo(
+                    chat_id=user.id,
+                    photo=banner_file_id,
+                    caption=card_text,
+                    parse_mode="Markdown",
+                    reply_markup=keyboard,
+                    disable_notification=silent_dm
+                )
+            else:
+                await context.bot.send_message(
+                    chat_id=user.id,
+                    text=card_text,
+                    parse_mode="Markdown",
+                    reply_markup=keyboard,
+                    disable_notification=silent_dm,
+                    disable_web_page_preview=True
+                )
+        except Exception as e:
+            logger.warning(f"Could not deliver DM to user {user.id}: {e}")
+
+    await floodguard_queue.put(dispatch_approval_dm)
 
 
 # ==========================================================
 # 3. PHOTO BANNER WORKFLOW & TELEGRAM COMMANDS
 # ==========================================================
 async def handle_photo_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Captures Telegram file_id when an admin sends a photo for their banner."""
     user_id = update.effective_user.id
     target_chat_id = context.user_data.get("awaiting_banner_chat_id")
 
@@ -272,11 +320,10 @@ async def handle_photo_upload(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
     except Exception as e:
         logger.error(f"Error saving banner file_id: {e}")
-        await update.message.reply_text("⚠️ Failed to link the photo banner. Please try again.")
+        await update.message.reply_text("⚠️ Failed to link photo banner. Please try again.")
 
 
 async def setbanner_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Triggers the photo upload prompt for a channel."""
     user_id = update.effective_user.id
     text = update.message.text.strip()
 
@@ -295,7 +342,6 @@ async def setbanner_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def removebanner_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Clears the photo banner for a channel."""
     user_id = update.effective_user.id
     target_chat_id = context.user_data.get("awaiting_banner_chat_id")
 
@@ -304,13 +350,13 @@ async def removebanner_command(update: Update, context: ContextTypes.DEFAULT_TYP
         try:
             target_chat_id = int(text.split("_")[1])
         except Exception:
-            await update.message.reply_text("Specify the channel: `/removebanner_<chat_id>`")
+            await update.message.reply_text("Specify channel: `/removebanner_<chat_id>`")
             return
 
     try:
         supabase.table("channels").update({"banner_file_id": None}).eq("chat_id", target_chat_id).eq("admin_id", user_id).execute()
         context.user_data["awaiting_banner_chat_id"] = None
-        await update.message.reply_text("🗑️ Photo banner removed. Your cards will be delivered as clean text.")
+        await update.message.reply_text("🗑️ Photo banner removed. Welcome cards will be sent as clean text.")
     except Exception as e:
         await update.message.reply_text("⚠️ Could not remove banner.")
 
@@ -360,15 +406,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     args = context.args
 
-    # Support deep-linked banner setup: /start setbanner_-100xxx
     if args and args[0].startswith("setbanner_"):
         try:
             cid = int(args[0].replace("setbanner_", ""))
             context.user_data["awaiting_banner_chat_id"] = cid
             await update.message.reply_text(
                 "📸 **Upload Welcome Banner Photo**\n\n"
-                "Send or forward the photo image you want to use for this channel.\n"
-                "_(Send `/removebanner` to revert to text-only)_"
+                "Send or forward the photo you want to use for this channel.\n"
+                "_(Send `/removebanner` to revert to clean text)_"
             )
             return
         except Exception:
@@ -379,14 +424,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"I am your **24/7 Auto-Request Approval Engine**.\n\n"
         f"👉 **Commands:**\n"
         f"• `/settings` - Open Mini App Control Center\n"
-        f"• `/mystats` - View your channel join stats\n\n"
-        f"Add me to your channel as an Admin with *Invite Users* permission to begin."
+        f"• `/mystats` - View your channel metrics\n\n"
+        f"Add me to your channel as an Admin with *Invite Users* rights to begin."
     )
     await update.message.reply_text(welcome_text, parse_mode="Markdown")
 
 
 # ==========================================================
-# 4. REST API & OWNER HQ ENDPOINTS
+# 4. REST API & OWNER HQ COMPREHENSIVE ENDPOINTS
 # ==========================================================
 class ChannelUpdatePayload(BaseModel):
     chat_id: int
@@ -399,10 +444,32 @@ class ChannelUpdatePayload(BaseModel):
     event_mode_enabled: bool = False
     event_message: Optional[str] = None
     silent_dm: bool = False
+    anti_bot_enabled: bool = False
 
 class TestDmPayload(BaseModel):
     chat_id: int
     admin_id: int
+
+class MigrationRequestPayload(BaseModel):
+    chat_id: int
+    admin_id: int
+    target_link: str
+
+class MigrationActionPayload(BaseModel):
+    admin_id: int
+    request_id: int
+    action: str  # 'approve' or 'reject'
+
+class DirectMessagePayload(BaseModel):
+    admin_id: int
+    target_admin_id: int
+    message: str
+
+class BlacklistPayload(BaseModel):
+    admin_id: int
+    entity_id: int
+    entity_type: str = "user"
+    reason: str = "Abuse / Spammer"
 
 class PromoSlotItem(BaseModel):
     slot_id: int
@@ -426,6 +493,9 @@ class ToggleChannelPayload(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Launch FloodGuard async background queue worker
+    worker_task = asyncio.create_task(floodguard_worker())
+
     tg_app.add_handler(CommandHandler("start", start_command))
     tg_app.add_handler(CommandHandler("settings", settings_command))
     tg_app.add_handler(CommandHandler("mystats", mystats_command))
@@ -445,7 +515,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Clean shutdown without deleting webhook
+    worker_task.cancel()
     await tg_app.stop()
     await tg_app.shutdown()
 
@@ -493,7 +563,8 @@ async def update_channel_settings(payload: ChannelUpdatePayload):
             "custom_btn_2_url": payload.custom_btn_2_url,
             "event_mode_enabled": payload.event_mode_enabled,
             "event_message": payload.event_message,
-            "silent_dm": payload.silent_dm
+            "silent_dm": payload.silent_dm,
+            "anti_bot_enabled": payload.anti_bot_enabled
         }).eq("chat_id", payload.chat_id).execute()
 
         return {"success": True}
@@ -501,9 +572,55 @@ async def update_channel_settings(payload: ChannelUpdatePayload):
         return {"success": False, "error": str(e)}
 
 
+@app.get("/api/channel/analytics/{chat_id}")
+async def get_channel_analytics(chat_id: int):
+    """Generates granular link attribution analytics for campaign tracking."""
+    try:
+        res = supabase.table("join_logs").select("invite_link_name").eq("chat_id", chat_id).execute()
+        raw_logs = res.data or []
+        names = [r.get("invite_link_name") or "Direct / Unknown" for r in raw_logs]
+        counts = Counter(names)
+        total = len(names)
+
+        breakdown = [
+            {
+                "name": name,
+                "count": count,
+                "percentage": round((count / total) * 100, 1) if total > 0 else 0
+            }
+            for name, count in counts.most_common()
+        ]
+
+        return {"success": True, "total": total, "breakdown": breakdown}
+    except Exception as e:
+        logger.error(f"Error fetching analytics for {chat_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/channel/request-migration")
+async def request_migration(payload: MigrationRequestPayload):
+    """Places an Audience Vault channel migration request into the Owner HQ queue."""
+    try:
+        # Calculate audience pool from the last 90 days
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+        res = supabase.table("join_logs").select("user_id").eq("chat_id", payload.chat_id).gte("created_at", cutoff).execute()
+        unique_users = len(set([r["user_id"] for r in (res.data or [])]))
+
+        supabase.table("migration_requests").insert({
+            "chat_id": payload.chat_id,
+            "admin_id": payload.admin_id,
+            "target_link": payload.target_link,
+            "user_count": unique_users,
+            "status": "pending"
+        }).execute()
+
+        return {"success": True, "audience_count": unique_users}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @app.post("/api/channel/test-dm")
 async def send_test_dm(payload: TestDmPayload):
-    """Sends a live preview of the welcome card directly to the channel admin."""
     try:
         res = supabase.table("channels").select("*").eq("chat_id", payload.chat_id).maybe_single().execute()
         config = res.data
@@ -573,7 +690,6 @@ async def get_owner_data(user_id: int):
         promo_res = supabase.table("promo_slots").select("*").order("slot_id").execute()
         promo_slots = promo_res.data or []
 
-        # Attach join totals to each channel
         for ch in all_channels:
             cnt_res = supabase.table("join_logs").select("id", count="exact").eq("chat_id", ch["chat_id"]).execute()
             ch["total_joins"] = cnt_res.count or 0
@@ -594,9 +710,142 @@ async def get_owner_data(user_id: int):
         return {"success": False, "error": str(e)}
 
 
+@app.get("/api/owner/admins/{user_id}")
+async def get_owner_admins(user_id: int):
+    """Compiles the master directory of channel admins and their network volume."""
+    if user_id != OWNER_ID:
+        return {"success": False, "error": "Unauthorized"}
+
+    try:
+        ch_res = supabase.table("channels").select("*").execute()
+        channels = ch_res.data or []
+
+        admins_map = {}
+        for ch in channels:
+            aid = ch["admin_id"]
+            if aid not in admins_map:
+                admins_map[aid] = {
+                    "admin_id": aid,
+                    "channels_count": 0,
+                    "channels": [],
+                    "total_joins": 0
+                }
+            admins_map[aid]["channels_count"] += 1
+            admins_map[aid]["channels"].append(ch.get("chat_title", "Channel"))
+
+        for aid, item in admins_map.items():
+            # Get total joins across all channels managed by this admin
+            j_res = supabase.table("join_logs").select("id", count="exact").in_(
+                "chat_id", [c["chat_id"] for c in channels if c["admin_id"] == aid]
+            ).execute()
+            item["total_joins"] = j_res.count or 0
+
+            try:
+                chat_info = await tg_app.bot.get_chat(aid)
+                item["name"] = chat_info.first_name or f"Admin {aid}"
+                item["username"] = f"@{chat_info.username}" if chat_info.username else None
+            except Exception:
+                item["name"] = f"Admin ({aid})"
+                item["username"] = None
+
+        return {"success": True, "admins": list(admins_map.values())}
+    except Exception as e:
+        logger.error(f"Error getting admins directory: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/owner/direct-message")
+async def send_direct_admin_dm(payload: DirectMessagePayload):
+    """Dispatches a direct administrative message to an individual channel owner."""
+    if payload.admin_id != OWNER_ID:
+        return {"success": False, "error": "Unauthorized"}
+
+    try:
+        msg_text = (
+            f"📩 **Direct Alert from Bot Management**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{payload.message}\n\n"
+            f"⚡ _Auto-Accept Network Operations_"
+        )
+        await tg_app.bot.send_message(chat_id=payload.target_admin_id, text=msg_text, parse_mode="Markdown")
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/owner/migrations/{user_id}")
+async def get_pending_migrations(user_id: int):
+    """Fetches all pending Audience Vault channel resurrection requests."""
+    if user_id != OWNER_ID:
+        return {"success": False, "error": "Unauthorized"}
+
+    try:
+        res = supabase.table("migration_requests").select("*").eq("status", "pending").order("created_at", desc=True).execute()
+        reqs = res.data or []
+        for r in reqs:
+            ch_info = supabase.table("channels").select("chat_title").eq("chat_id", r["chat_id"]).maybe_single().execute()
+            r["channel_title"] = ch_info.data.get("chat_title") if ch_info and ch_info.data else "Unknown Channel"
+        return {"success": True, "requests": reqs}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/owner/migrations/action")
+async def handle_migration_action(payload: MigrationActionPayload):
+    """Approves or rejects a channel resurrection request with queued FloodGuard DMs."""
+    if payload.admin_id != OWNER_ID:
+        return {"success": False, "error": "Unauthorized"}
+
+    try:
+        req_res = supabase.table("migration_requests").select("*").eq("id", payload.request_id).maybe_single().execute()
+        req = req_res.data
+        if not req:
+            return {"success": False, "error": "Request not found"}
+
+        if payload.action == "reject":
+            supabase.table("migration_requests").update({"status": "rejected"}).eq("id", payload.request_id).execute()
+            return {"success": True, "status": "rejected"}
+
+        # If approved, fetch subscribers from join_logs in the last 90 days
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+        logs_res = supabase.table("join_logs").select("user_id").eq("chat_id", req["chat_id"]).gte("created_at", cutoff).execute()
+        subscribers = list(set([r["user_id"] for r in (logs_res.data or [])]))
+
+        ch_info = supabase.table("channels").select("chat_title").eq("chat_id", req["chat_id"]).maybe_single().execute()
+        ch_title = ch_info.data.get("chat_title") if ch_info and ch_info.data else "Channel"
+
+        migration_text = (
+            f"🚨 **Important Notice from {ch_title}!**\n\n"
+            f"Our channel has migrated to a new permanent location.\n"
+            f"Tap the button below to rejoin immediately so you don't miss any updates!"
+        )
+        migration_kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🚀 Rejoin Channel Now", url=req["target_link"])]
+        ])
+
+        # Enqueue via FloodGuard to protect API limits
+        for uid in subscribers:
+            async def send_migration_notice(target_u=uid):
+                try:
+                    await tg_app.bot.send_message(
+                        chat_id=target_u,
+                        text=migration_text,
+                        reply_markup=migration_kb,
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    pass
+            await floodguard_queue.put(send_migration_notice)
+
+        supabase.table("migration_requests").update({"status": "approved"}).eq("id", payload.request_id).execute()
+        return {"success": True, "status": "approved", "dispatched_count": len(subscribers)}
+    except Exception as e:
+        logger.error(f"Migration processing error: {e}")
+        return {"success": False, "error": str(e)}
+
+
 @app.post("/api/owner/promo-slots")
 async def update_promo_slots(payload: UpdatePromoSlotsPayload):
-    """Allows Owner to configure up to 3 promo buttons with text, URL, and active toggles."""
     if payload.admin_id != OWNER_ID:
         return {"success": False, "error": "Unauthorized"}
 
@@ -611,7 +860,6 @@ async def update_promo_slots(payload: UpdatePromoSlotsPayload):
             }).execute()
         return {"success": True}
     except Exception as e:
-        logger.error(f"Failed to update promo slots: {e}")
         return {"success": False, "error": str(e)}
 
 
@@ -624,7 +872,6 @@ async def broadcast_to_admins(payload: BroadcastPayload):
         channels_res = supabase.table("channels").select("admin_id").execute()
         admin_ids = list(set([c["admin_id"] for c in (channels_res.data or []) if c.get("admin_id")]))
 
-        sent_count = 0
         formatted = (
             f"📢 **NETWORK ANNOUNCEMENT**\n"
             f"━━━━━━━━━━━━━━━━━━━\n\n"
@@ -632,6 +879,7 @@ async def broadcast_to_admins(payload: BroadcastPayload):
             f"⚡ _Sent by Bot Management_"
         )
 
+        sent_count = 0
         for aid in admin_ids:
             try:
                 await tg_app.bot.send_message(chat_id=aid, text=formatted, parse_mode="Markdown")
@@ -651,6 +899,22 @@ async def toggle_channel_status(payload: ToggleChannelPayload):
 
     try:
         supabase.table("channels").update({"is_active": payload.is_active}).eq("chat_id", payload.chat_id).execute()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/owner/blacklist/add")
+async def add_to_blacklist(payload: BlacklistPayload):
+    if payload.admin_id != OWNER_ID:
+        return {"success": False, "error": "Unauthorized"}
+
+    try:
+        supabase.table("network_blacklist").upsert({
+            "entity_id": payload.entity_id,
+            "entity_type": payload.entity_type,
+            "reason": payload.reason
+        }).execute()
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}
