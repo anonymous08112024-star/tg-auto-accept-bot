@@ -29,7 +29,7 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 OWNER_ID = int(os.getenv("OWNER_ID", "5527067319"))
-MINI_APP_URL = os.getenv("MINI_APP_URL", "https://tg-auto-accept-bot.onrender.com")
+MINI_APP_URL = os.getenv("MINI_APP_URL", "https://tg-accept-dash.pages.dev")
 
 # Network Co-Promotion Settings (Your Channel)
 PROMO_CHANNEL_NAME = "Bold Cinema"
@@ -135,7 +135,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     if btn_text and btn_url and btn_url.startswith("http"):
         button_rows.append([InlineKeyboardButton(text=btn_text, url=btn_url)])
 
-    # Append promotional button
+    # Network co-promotion button
     button_rows.append([InlineKeyboardButton(text=f"🔥 Explore {PROMO_CHANNEL_NAME}", url=PROMO_CHANNEL_URL)])
     keyboard = InlineKeyboardMarkup(button_rows)
 
@@ -160,71 +160,11 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 # ==========================================================
-# 3. OWNER DEDICATED ANALYTICS DASHBOARD
-# ==========================================================
-async def owner_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comprehensive analytics restricted strictly to OWNER_ID."""
-    user_id = update.effective_user.id
-    if user_id != OWNER_ID:
-        await update.message.reply_text("⛔ Access denied. This command is restricted to the bot owner.")
-        return
-
-    status_msg = await update.message.reply_text("🔄 Compiling live network metrics...")
-
-    try:
-        # Channels count
-        channels_res = supabase.table("channels").select("chat_id, is_active", count="exact").execute()
-        total_channels = channels_res.count or 0
-        active_channels = len([c for c in (channels_res.data or []) if c.get("is_active")])
-
-        # Lifetime Joins
-        lifetime_res = supabase.table("join_logs").select("id", count="exact").execute()
-        lifetime_joins = lifetime_res.count or 0
-
-        # Last 24 Hours Joins
-        past_24h = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-        joins_24h_res = supabase.table("join_logs").select("id", count="exact").gte("created_at", past_24h).execute()
-        joins_24h = joins_24h_res.count or 0
-
-        # Top 5 Channels
-        top_channels_data = supabase.rpc("get_top_channels").execute()
-        top_channel_lines = ""
-        if top_channels_data and top_channels_data.data:
-            for idx, ch in enumerate(top_channels_data.data[:5], 1):
-                top_channel_lines += f"{idx}. `{ch.get('chat_title', 'Unknown')}`: **{ch.get('join_count', 0)}**\n"
-        else:
-            top_channel_lines = "• _Analytics tracking active; counters accumulating._\n"
-
-        dashboard_text = (
-            f"👑 **OWNER CONTROL CENTER**\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"🌐 **Network Overview:**\n"
-            f"• Total Channels Connected: **{total_channels}** ({active_channels} Active)\n"
-            f"• Joins Processed (Last 24h): **{joins_24h:,}**\n"
-            f"• Lifetime Total Joins: **{lifetime_joins:,}**\n\n"
-            f"📊 **Top Channels by Joins:**\n"
-            f"{top_channel_lines}\n"
-            f"🚀 **Co-Promotion Status:**\n"
-            f"• Target Channel: `{PROMO_CHANNEL_NAME}`\n"
-            f"• Promotion Link: `{PROMO_CHANNEL_URL}`\n"
-            f"• Footer Visibility: **100% Active**\n\n"
-            f"⚡ System Status: **Operational (Render / Supabase)**"
-        )
-
-        await status_msg.edit_text(dashboard_text, parse_mode="Markdown")
-
-    except Exception as e:
-        logger.error(f"Error compiling owner dashboard: {e}")
-        await status_msg.edit_text(f"⚠️ Error compiling metrics: `{str(e)}`", parse_mode="Markdown")
-
-
-# ==========================================================
-# 4. CHANNEL ADMIN STATS & SETTINGS COMMANDS
+# 3. CHAT COMMANDS
 # ==========================================================
 async def channel_admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Enables channel admins to inspect their channel's join counts and invite links."""
+    """Enables channel admins to inspect their channel's join counts."""
     user_id = update.effective_user.id
-
     try:
         channels_res = supabase.table("channels").select("*").eq("admin_id", user_id).execute()
         admin_channels = channels_res.data or []
@@ -260,10 +200,9 @@ async def channel_admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         report += "⚡ _Requests are accepted automatically 24/7._"
         await update.message.reply_text(report, parse_mode="Markdown")
-
     except Exception as e:
         logger.error(f"Error retrieving admin stats: {e}")
-        await update.message.reply_text("⚠️ Could not load your stats right now. Please try again in a moment.")
+        await update.message.reply_text("⚠️ Could not load your stats right now.")
 
 
 async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -272,36 +211,28 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⚙️ Open Channel Dashboard", web_app=WebAppInfo(url=MINI_APP_URL))]
     ])
     await update.message.reply_text(
-        "🛠 **Channel Settings & Customization**\n\n"
-        "Tap below to customize your channel's welcome message, add a custom button, and track campaigns.",
+        "🛠 **Control Center & Channel Hub**\n\n"
+        "Tap below to access settings, custom messaging, and platform analytics.",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
 
 
-# ==========================================================
-# 5. START COMMAND / ONBOARDING
-# ==========================================================
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name
     welcome_text = (
         f"Hello {user_name}! 👋\n\n"
         f"I am your **24/7 Auto-Request Approval Engine**.\n\n"
-        f"🚀 **Features:**\n"
-        f"• Instant, zero-delay approval on invite links.\n"
-        f"• Custom welcome message for every new member.\n"
-        f"• Ad campaign & invite-link conversion tracking.\n"
-        f"• 100% free and requires **only Add Members permission**.\n\n"
         f"👉 **Commands:**\n"
-        f"• `/settings` - Configure custom welcome card & buttons\n"
-        f"• `/mystats` - View your channel join metrics\n\n"
+        f"• `/settings` - Open the visual Mini App Dashboard\n"
+        f"• `/mystats` - View your channel metrics\n\n"
         f"Add me to your Channel as an Admin with *'Invite Users'* rights to begin!"
     )
     await update.message.reply_text(welcome_text, parse_mode="Markdown")
 
 
 # ==========================================================
-# 6. TMA REST API (FOR CLOUDFLARE FRONTEND)
+# 4. REST API & OWNER ENDPOINTS (FOR CLOUDFLARE MINI APP)
 # ==========================================================
 class ChannelUpdatePayload(BaseModel):
     chat_id: int
@@ -310,17 +241,21 @@ class ChannelUpdatePayload(BaseModel):
     custom_btn_text: str
     custom_btn_url: str
 
+class BroadcastPayload(BaseModel):
+    admin_id: int
+    message: str
 
-# ==========================================================
-# 7. LIFESPAN & FASTAPI WEBHOOK PIPELINE
-# ==========================================================
+class ToggleChannelPayload(BaseModel):
+    admin_id: int
+    chat_id: int
+    is_active: bool
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Register command and update handlers
     tg_app.add_handler(CommandHandler("start", start_command))
     tg_app.add_handler(CommandHandler("mystats", channel_admin_stats))
     tg_app.add_handler(CommandHandler("settings", settings_command))
-    tg_app.add_handler(CommandHandler("owner", owner_dashboard))
     tg_app.add_handler(ChatJoinRequestHandler(handle_join_request))
     tg_app.add_handler(ChatMemberHandler(handle_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))
 
@@ -333,14 +268,12 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    await tg_app.bot.delete_webhook()
     await tg_app.stop()
     await tg_app.shutdown()
 
 
 app = FastAPI(lifespan=lifespan)
 
-# Enable CORS for Cloudflare Mini App integration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -352,13 +285,17 @@ app.add_middleware(
 
 @app.get("/api/channels/{admin_id}")
 async def get_admin_channels(admin_id: int):
-    """Fetches all channels managed by an admin for the Mini App."""
+    """Fetches channels for a regular admin, plus owner status flag."""
     try:
         res = supabase.table("channels").select("*").eq("admin_id", admin_id).execute()
-        return {"success": True, "channels": res.data or []}
+        return {
+            "success": True,
+            "is_owner": (admin_id == OWNER_ID),
+            "channels": res.data or []
+        }
     except Exception as e:
-        logger.error(f"Error fetching channels for admin {admin_id}: {e}")
-        return {"success": False, "channels": []}
+        logger.error(f"Error fetching channels for {admin_id}: {e}")
+        return {"success": False, "is_owner": False, "channels": []}
 
 
 @app.post("/api/channel/update")
@@ -366,7 +303,11 @@ async def update_channel_settings(payload: ChannelUpdatePayload):
     """Saves custom welcome messaging configured in the Mini App."""
     try:
         check = supabase.table("channels").select("admin_id").eq("chat_id", payload.chat_id).maybe_single().execute()
-        if not check.data or int(check.data.get("admin_id")) != payload.admin_id:
+        if not check.data:
+            return {"success": False, "error": "Channel not found"}
+            
+        # Allow owner OR channel admin to update
+        if int(check.data.get("admin_id")) != payload.admin_id and payload.admin_id != OWNER_ID:
             return {"success": False, "error": "Unauthorized"}
 
         supabase.table("channels").update({
@@ -377,7 +318,95 @@ async def update_channel_settings(payload: ChannelUpdatePayload):
 
         return {"success": True}
     except Exception as e:
-        logger.error(f"Error updating channel {payload.chat_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+
+# --- OWNER EXCLUSIVE API ROUTES ---
+
+@app.get("/api/owner/data/{user_id}")
+async def get_owner_data(user_id: int):
+    """Returns global network statistics and master channel list strictly for OWNER_ID."""
+    if user_id != OWNER_ID:
+        return {"success": False, "error": "Unauthorized access"}
+
+    try:
+        # Channels metrics
+        channels_res = supabase.table("channels").select("*").order("created_at", desc=True).execute()
+        all_channels = channels_res.data or []
+        total_channels = len(all_channels)
+        active_channels = len([c for c in all_channels if c.get("is_active")])
+
+        # Joins metrics
+        total_joins_res = supabase.table("join_logs").select("id", count="exact").execute()
+        total_joins = total_joins_res.count or 0
+
+        past_24h = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        joins_24h_res = supabase.table("join_logs").select("id", count="exact").gte("created_at", past_24h).execute()
+        joins_24h = joins_24h_res.count or 0
+
+        # Attach join count to each channel
+        for ch in all_channels:
+            cid = ch["chat_id"]
+            cnt_res = supabase.table("join_logs").select("id", count="exact").eq("chat_id", cid).execute()
+            ch["total_joins"] = cnt_res.count or 0
+
+        return {
+            "success": True,
+            "metrics": {
+                "total_channels": total_channels,
+                "active_channels": active_channels,
+                "joins_24h": joins_24h,
+                "total_joins": total_joins,
+                "promo_name": PROMO_CHANNEL_NAME,
+                "promo_url": PROMO_CHANNEL_URL
+            },
+            "channels": all_channels
+        }
+    except Exception as e:
+        logger.error(f"Error compiling owner data: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/owner/broadcast")
+async def broadcast_to_admins(payload: BroadcastPayload):
+    """Sends an official announcement to all channel admins across the bot network."""
+    if payload.admin_id != OWNER_ID:
+        return {"success": False, "error": "Unauthorized"}
+
+    try:
+        channels_res = supabase.table("channels").select("admin_id").execute()
+        admin_ids = list(set([c["admin_id"] for c in (channels_res.data or []) if c.get("admin_id")]))
+
+        sent_count = 0
+        formatted_broadcast = (
+            f"📢 **NETWORK ANNOUNCEMENT**\n"
+            f"━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{payload.message}\n\n"
+            f"⚡ _Sent by Bot Management_"
+        )
+
+        for aid in admin_ids:
+            try:
+                await tg_app.bot.send_message(chat_id=aid, text=formatted_broadcast, parse_mode="Markdown")
+                sent_count += 1
+            except Exception as send_err:
+                logger.warning(f"Failed delivery to admin {aid}: {send_err}")
+
+        return {"success": True, "delivered": sent_count, "total_admins": len(admin_ids)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/owner/toggle-channel")
+async def toggle_channel_status(payload: ToggleChannelPayload):
+    """Enables or disables a channel remotely from the owner panel."""
+    if payload.admin_id != OWNER_ID:
+        return {"success": False, "error": "Unauthorized"}
+
+    try:
+        supabase.table("channels").update({"is_active": payload.is_active}).eq("chat_id", payload.chat_id).execute()
+        return {"success": True}
+    except Exception as e:
         return {"success": False, "error": str(e)}
 
 
