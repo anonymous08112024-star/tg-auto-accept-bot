@@ -4,7 +4,9 @@ from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response, status
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember, WebAppInfo
 from telegram.ext import (
     Application,
     ChatJoinRequestHandler,
@@ -23,14 +25,15 @@ logger = logging.getLogger(__name__)
 
 # Environment Configuration
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("BOT_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 OWNER_ID = int(os.getenv("OWNER_ID", "5527067319"))
+MINI_APP_URL = os.getenv("MINI_APP_URL", "https://tg-auto-accept-bot.onrender.com")
 
 # Network Co-Promotion Settings (Your Channel)
 PROMO_CHANNEL_NAME = "Bold Cinema"
-PROMO_CHANNEL_URL = "https://t.me/boldcinema_bot"  # Replace with your channel link
+PROMO_CHANNEL_URL = "https://t.me/boldcinema_bot"
 
 # Initialize Supabase Client
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -52,7 +55,6 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
     if new_status in [ChatMember.ADMINISTRATOR, "administrator"]:
         logger.info(f"Bot promoted to admin in '{chat.title}' ({chat.id}) by {admin_user.id}")
         try:
-            # Register or update channel record
             supabase.table("channels").upsert({
                 "chat_id": chat.id,
                 "chat_title": chat.title or "Untitled Channel",
@@ -60,12 +62,12 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                 "is_active": True
             }).execute()
 
-            # Send a confirmation alert to the channel admin
             welcome_admin_text = (
                 f"✅ **Auto-Approval Activated for {chat.title}!**\n\n"
                 f"• All incoming join requests will now be approved instantly.\n"
-                f"• Type `/mystats` here or in our DM to view conversion metrics.\n"
-                f"• Required permissions: Only *'Invite Users / Add Members'* is needed."
+                f"• Type `/mystats` to view join analytics.\n"
+                f"• Type `/settings` to open the visual customization dashboard.\n"
+                f"• Required permission: Only *'Invite Users / Add Members'* is needed."
             )
             await context.bot.send_message(chat_id=admin_user.id, text=welcome_admin_text, parse_mode="Markdown")
         except Exception as e:
@@ -133,7 +135,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     if btn_text and btn_url and btn_url.startswith("http"):
         button_rows.append([InlineKeyboardButton(text=btn_text, url=btn_url)])
 
-    # Add network co-promotion button
+    # Append promotional button
     button_rows.append([InlineKeyboardButton(text=f"🔥 Explore {PROMO_CHANNEL_NAME}", url=PROMO_CHANNEL_URL)])
     keyboard = InlineKeyboardMarkup(button_rows)
 
@@ -161,7 +163,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
 # 3. OWNER DEDICATED ANALYTICS DASHBOARD
 # ==========================================================
 async def owner_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comprehensive, executive-level analytics restricted strictly to OWNER_ID."""
+    """Comprehensive analytics restricted strictly to OWNER_ID."""
     user_id = update.effective_user.id
     if user_id != OWNER_ID:
         await update.message.reply_text("⛔ Access denied. This command is restricted to the bot owner.")
@@ -170,23 +172,22 @@ async def owner_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("🔄 Compiling live network metrics...")
 
     try:
-        # 1. Total Channels count
+        # Channels count
         channels_res = supabase.table("channels").select("chat_id, is_active", count="exact").execute()
         total_channels = channels_res.count or 0
         active_channels = len([c for c in (channels_res.data or []) if c.get("is_active")])
 
-        # 2. Total Lifetime Joins
+        # Lifetime Joins
         lifetime_res = supabase.table("join_logs").select("id", count="exact").execute()
         lifetime_joins = lifetime_res.count or 0
 
-        # 3. Last 24 Hours Joins
+        # Last 24 Hours Joins
         past_24h = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
         joins_24h_res = supabase.table("join_logs").select("id", count="exact").gte("created_at", past_24h).execute()
         joins_24h = joins_24h_res.count or 0
 
-        # 4. Top 5 Channels by Lifetime Volume
+        # Top 5 Channels
         top_channels_data = supabase.rpc("get_top_channels").execute()
-        # Fallback if RPC is not present: query recent join logs
         top_channel_lines = ""
         if top_channels_data and top_channels_data.data:
             for idx, ch in enumerate(top_channels_data.data[:5], 1):
@@ -194,7 +195,6 @@ async def owner_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             top_channel_lines = "• _Analytics tracking active; counters accumulating._\n"
 
-        # Construct Owner Dashboard Message
         dashboard_text = (
             f"👑 **OWNER CONTROL CENTER**\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -219,14 +219,13 @@ async def owner_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ==========================================================
-# 4. CHANNEL ADMIN STATS COMMAND
+# 4. CHANNEL ADMIN STATS & SETTINGS COMMANDS
 # ==========================================================
 async def channel_admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Enables any channel admin to inspect their channel's join counts and invite links."""
+    """Enables channel admins to inspect their channel's join counts and invite links."""
     user_id = update.effective_user.id
 
     try:
-        # Find all channels owned by this user
         channels_res = supabase.table("channels").select("*").eq("admin_id", user_id).execute()
         admin_channels = channels_res.data or []
 
@@ -247,11 +246,9 @@ async def channel_admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE
             cid = ch["chat_id"]
             title = ch["chat_title"]
 
-            # Joins in last 24h
             res_24h = supabase.table("join_logs").select("id", count="exact").eq("chat_id", cid).gte("created_at", past_24h).execute()
             count_24h = res_24h.count or 0
 
-            # Lifetime joins
             res_total = supabase.table("join_logs").select("id", count="exact").eq("chat_id", cid).execute()
             count_total = res_total.count or 0
 
@@ -269,6 +266,19 @@ async def channel_admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("⚠️ Could not load your stats right now. Please try again in a moment.")
 
 
+async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Provides a button that launches the Telegram Mini App dashboard."""
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⚙️ Open Channel Dashboard", web_app=WebAppInfo(url=MINI_APP_URL))]
+    ])
+    await update.message.reply_text(
+        "🛠 **Channel Settings & Customization**\n\n"
+        "Tap below to customize your channel's welcome message, add a custom button, and track campaigns.",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+
+
 # ==========================================================
 # 5. START COMMAND / ONBOARDING
 # ==========================================================
@@ -276,25 +286,40 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name
     welcome_text = (
         f"Hello {user_name}! 👋\n\n"
-        f"I am the **24/7 Auto-Request Approval Engine**.\n\n"
+        f"I am your **24/7 Auto-Request Approval Engine**.\n\n"
         f"🚀 **Features:**\n"
         f"• Instant, zero-delay approval on invite links.\n"
         f"• Custom welcome message for every new member.\n"
         f"• Ad campaign & invite-link conversion tracking.\n"
         f"• 100% free and requires **only Add Members permission**.\n\n"
-        f"👉 **How to use:** Add me to your Channel or Group as an Admin with *'Invite Users'* rights!"
+        f"👉 **Commands:**\n"
+        f"• `/settings` - Configure custom welcome card & buttons\n"
+        f"• `/mystats` - View your channel join metrics\n\n"
+        f"Add me to your Channel as an Admin with *'Invite Users'* rights to begin!"
     )
     await update.message.reply_text(welcome_text, parse_mode="Markdown")
 
 
 # ==========================================================
-# 6. LIFESPAN & FASTAPI WEBHOOK PIPELINE
+# 6. TMA REST API (FOR CLOUDFLARE FRONTEND)
+# ==========================================================
+class ChannelUpdatePayload(BaseModel):
+    chat_id: int
+    admin_id: int
+    custom_message: str
+    custom_btn_text: str
+    custom_btn_url: str
+
+
+# ==========================================================
+# 7. LIFESPAN & FASTAPI WEBHOOK PIPELINE
 # ==========================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Register handlers
+    # Register command and update handlers
     tg_app.add_handler(CommandHandler("start", start_command))
     tg_app.add_handler(CommandHandler("mystats", channel_admin_stats))
+    tg_app.add_handler(CommandHandler("settings", settings_command))
     tg_app.add_handler(CommandHandler("owner", owner_dashboard))
     tg_app.add_handler(ChatJoinRequestHandler(handle_join_request))
     tg_app.add_handler(ChatMemberHandler(handle_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))
@@ -314,6 +339,46 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Enable CORS for Cloudflare Mini App integration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/api/channels/{admin_id}")
+async def get_admin_channels(admin_id: int):
+    """Fetches all channels managed by an admin for the Mini App."""
+    try:
+        res = supabase.table("channels").select("*").eq("admin_id", admin_id).execute()
+        return {"success": True, "channels": res.data or []}
+    except Exception as e:
+        logger.error(f"Error fetching channels for admin {admin_id}: {e}")
+        return {"success": False, "channels": []}
+
+
+@app.post("/api/channel/update")
+async def update_channel_settings(payload: ChannelUpdatePayload):
+    """Saves custom welcome messaging configured in the Mini App."""
+    try:
+        check = supabase.table("channels").select("admin_id").eq("chat_id", payload.chat_id).maybe_single().execute()
+        if not check.data or int(check.data.get("admin_id")) != payload.admin_id:
+            return {"success": False, "error": "Unauthorized"}
+
+        supabase.table("channels").update({
+            "custom_message": payload.custom_message,
+            "custom_btn_text": payload.custom_btn_text,
+            "custom_btn_url": payload.custom_btn_url
+        }).eq("chat_id", payload.chat_id).execute()
+
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error updating channel {payload.chat_id}: {e}")
+        return {"success": False, "error": str(e)}
 
 
 @app.post("/telegram")
