@@ -12,28 +12,33 @@
       color: var(--tg-theme-text-color, #f8fafc);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
+    .toggle-checkbox:checked {
+      right: 0;
+      border-color: #3b82f6;
+    }
+    .toggle-checkbox:checked + .toggle-label {
+      background-color: #2563eb;
+    }
   </style>
 </head>
-<body class="p-4 pb-14 max-w-lg mx-auto">
+<body class="p-4 pb-16 max-w-lg mx-auto">
 
-  <!-- Header -->
+  <!-- Top Bar -->
   <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
     <div>
       <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
         <span>⚡</span> Control Center
       </h1>
-      <p class="text-xs text-slate-400">Telegram Auto-Accept Engine</p>
+      <p class="text-[11px] text-slate-400">@AutoRequestAcceptorxBot Hub</p>
     </div>
-    <div class="flex items-center gap-2">
-      <span id="roleBadge" class="text-[11px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full font-medium">
-        Admin
-      </span>
-    </div>
+    <span id="roleBadge" class="text-[11px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full font-medium">
+      Admin
+    </span>
   </div>
 
-  <!-- Role-Based Navigation (Visible only to Owner) -->
-  <div id="ownerNav" class="hidden grid grid-cols-2 gap-2 bg-slate-900/80 p-1 rounded-xl border border-slate-800 mb-5">
-    <button id="tabChannelBtn" class="py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white transition-all">
+  <!-- Role-Based Navigation (Owner Exclusive) -->
+  <div id="ownerNav" class="hidden grid grid-cols-2 gap-2 bg-slate-900/90 p-1 rounded-xl border border-slate-800 mb-5">
+    <button id="tabChannelBtn" class="py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white transition-all shadow-sm">
       📢 Channel Hub
     </button>
     <button id="tabOwnerBtn" class="py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">
@@ -48,70 +53,157 @@
   </div>
 
   <!-- ========================================== -->
-  <!-- TAB 1: REGULAR CHANNEL ADMIN SETTINGS      -->
+  <!-- TAB 1: CHANNEL ADMIN SETTINGS              -->
   <!-- ========================================== -->
   <div id="channelSection" class="hidden space-y-5">
     
-    <!-- No Channels State -->
+    <!-- No Channels Connected State -->
     <div id="noChannels" class="hidden bg-slate-900/60 border border-slate-800 rounded-2xl p-6 text-center">
       <div class="text-3xl mb-2">📢</div>
       <h3 class="text-sm font-semibold text-white mb-1">No Channels Connected</h3>
       <p class="text-xs text-slate-400 leading-relaxed">
-        Add this bot as an <b>Administrator</b> with <i>Invite Users</i> rights in your channel to begin.
+        Add <b>@AutoRequestAcceptorxBot</b> as an <b>Administrator</b> with <i>Invite Users</i> permission in your channel to begin.
       </p>
     </div>
 
     <div id="channelForm" class="space-y-5 hidden">
-      <!-- Channel Selector -->
-      <div>
-        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Select Channel</label>
+      
+      <!-- Channel Selector & Banner Status -->
+      <div class="space-y-2">
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Target Channel</label>
         <select id="channelSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
         </select>
+        
+        <!-- Photo Banner Status Bar -->
+        <div class="flex items-center justify-between bg-slate-900/70 border border-slate-800 px-3.5 py-2.5 rounded-xl text-xs">
+          <div class="flex items-center gap-2">
+            <span id="bannerIndicator" class="h-2 w-2 rounded-full bg-slate-600"></span>
+            <span id="bannerStatusText" class="text-slate-300">Banner: Text-only</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="setBannerBtn" class="text-[11px] font-semibold text-blue-400 hover:text-blue-300 transition-colors">
+              📸 Set Photo
+            </button>
+            <span class="text-slate-700">|</span>
+            <button id="removeBannerBtn" class="text-[11px] font-semibold text-rose-400 hover:text-rose-300 transition-colors">
+              Remove
+            </button>
+          </div>
+        </div>
       </div>
 
-      <!-- Live DM Preview Box -->
+      <!-- Live Mobile DM Preview -->
       <div>
-        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Live DM Preview</label>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Subscriber DM Preview</label>
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 shadow-xl">
           <div class="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50 space-y-2.5">
+            
+            <div id="previewBannerBadge" class="hidden bg-blue-500/20 text-blue-300 text-[10px] px-2.5 py-1 rounded-md text-center font-semibold">
+              🖼️ PHOTO BANNER ATTACHED
+            </div>
+
             <p class="text-xs font-semibold text-blue-400" id="previewTitle">🎉 Request Approved!</p>
             <p class="text-xs text-slate-200 whitespace-pre-line leading-relaxed" id="previewMessage">Welcome to the channel!</p>
             
             <div class="pt-2 border-t border-slate-700/60 space-y-1.5">
-              <button id="previewCustomBtn" class="w-full py-2 px-3 text-xs font-medium text-center bg-blue-600 text-white rounded-lg pointer-events-none">
-                Official Channel
+              <button id="previewBtn1" class="w-full py-2 px-3 text-xs font-medium text-center bg-blue-600 text-white rounded-lg pointer-events-none truncate">
+                📢 Official Channel
               </button>
-              <button disabled class="w-full py-2 px-3 text-xs font-medium text-center bg-slate-700/80 text-slate-300 rounded-lg opacity-80 cursor-not-allowed">
-                🔥 Explore Bold Cinema
+              <button id="previewBtn2" class="hidden w-full py-2 px-3 text-xs font-medium text-center bg-slate-700/80 text-white rounded-lg pointer-events-none truncate">
+                Secondary Button
+              </button>
+              <button disabled class="w-full py-2 px-3 text-xs font-medium text-center bg-slate-800 text-slate-300 border border-slate-700 rounded-lg opacity-85 cursor-not-allowed truncate">
+                🔥 Network Co-Promotion Slot
               </button>
             </div>
-            <p class="text-[10px] text-slate-500 text-center">⚡ Powered by Auto-Accept Network</p>
+            <p class="text-[10px] text-slate-400 text-center font-medium">⚡ Auto-Approved via @AutoRequestAcceptorxBot</p>
           </div>
         </div>
       </div>
 
-      <!-- Customization Inputs -->
-      <div class="space-y-3.5">
+      <!-- Welcome Message & Template Variables -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Standard Welcome Message</label>
+        </div>
+        <textarea id="customMessage" rows="3" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 leading-relaxed" placeholder="Welcome {name}! Your request has been approved."></textarea>
+        
+        <!-- Dynamic Variable Helper Chips -->
+        <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
+          <span class="text-[10px] text-slate-500 font-medium">Insert tag:</span>
+          <button type="button" onclick="insertTag('{name}')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-0.5 rounded-md font-mono border border-slate-700/80">{name}</button>
+          <button type="button" onclick="insertTag('{channel}')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-0.5 rounded-md font-mono border border-slate-700/80">{channel}</button>
+          <button type="button" onclick="insertTag('{username}')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-0.5 rounded-md font-mono border border-slate-700/80">{username}</button>
+          <button type="button" onclick="insertTag('{time}')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-0.5 rounded-md font-mono border border-slate-700/80">{time}</button>
+        </div>
+      </div>
+
+      <!-- Dual Smart Buttons -->
+      <div class="space-y-3 bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl">
+        <p class="text-xs font-semibold text-slate-300">Custom Inline Buttons</p>
+        
+        <!-- Button 1 -->
+        <div class="space-y-1.5">
+          <label class="block text-[11px] font-medium text-slate-400">Primary Button (Pre-configured)</label>
+          <div class="grid grid-cols-2 gap-2">
+            <input type="text" id="btn1Text" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="Button Title">
+            <input type="url" id="btn1Url" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="https://t.me/your_channel">
+          </div>
+        </div>
+
+        <!-- Button 2 -->
+        <div class="space-y-1.5 pt-2 border-t border-slate-800">
+          <label class="block text-[11px] font-medium text-slate-400">Secondary Button (Optional)</label>
+          <div class="grid grid-cols-2 gap-2">
+            <input type="text" id="btn2Text" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="e.g. VIP Group / Website">
+            <input type="url" id="btn2Url" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="https://...">
+          </div>
+        </div>
+      </div>
+
+      <!-- Event / Match-Day Mode -->
+      <div class="bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h4 class="text-xs font-semibold text-white flex items-center gap-1.5">
+              <span>⚡</span> Event / Match-Day Mode
+            </h4>
+            <p class="text-[10px] text-slate-400">Temporarily override welcome text with high-urgency event copy</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="eventModeToggle" class="sr-only peer">
+            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+          </label>
+        </div>
+
+        <div id="eventMessageContainer" class="hidden pt-2 border-t border-slate-800 space-y-1.5">
+          <label class="block text-[11px] font-medium text-amber-400">Event Message Copy</label>
+          <textarea id="eventMessage" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="🚨 MATCH DAY SPECIAL: Predictions are live! Tap below to open today's card."></textarea>
+        </div>
+      </div>
+
+      <!-- Silent DM Delivery -->
+      <div class="flex items-center justify-between bg-slate-900/60 border border-slate-800 px-3.5 py-3 rounded-2xl">
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Welcome Message</label>
-          <textarea id="customMessage" rows="3" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 leading-relaxed"></textarea>
+          <h4 class="text-xs font-semibold text-white">🔕 Silent DM Delivery</h4>
+          <p class="text-[10px] text-slate-400">Send approval messages without sound/vibration alerts</p>
         </div>
-
-        <div class="grid grid-cols-1 gap-2.5">
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Custom Button Title</label>
-            <input type="text" id="btnText" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="e.g. Join Discussion Group">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Custom Button Link (URL)</label>
-            <input type="url" id="btnUrl" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="https://t.me/your_link">
-          </div>
-        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="silentDmToggle" class="sr-only peer">
+          <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
       </div>
 
-      <button id="saveBtn" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all shadow-lg shadow-blue-600/20 active:scale-[0.99]">
-        Save Channel Configuration
-      </button>
+      <!-- Action Buttons -->
+      <div class="space-y-2 pt-1">
+        <button id="saveBtn" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all shadow-lg shadow-blue-600/20 active:scale-[0.99]">
+          Save Channel Configuration
+        </button>
+        <button id="testDmBtn" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
+          📲 Send Test DM to My Telegram
+        </button>
+      </div>
+
     </div>
   </div>
 
@@ -120,10 +212,10 @@
   <!-- ========================================== -->
   <div id="ownerSection" class="hidden space-y-6">
     
-    <!-- Telemetry Metric Cards -->
+    <!-- Telemetry Cards -->
     <div class="grid grid-cols-2 gap-3">
       <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
-        <p class="text-[11px] font-medium text-slate-400">Total Network Joins</p>
+        <p class="text-[11px] font-medium text-slate-400">Total Joins</p>
         <p class="text-xl font-bold text-white mt-1" id="mTotalJoins">0</p>
         <span class="text-[10px] text-emerald-400 font-medium">All-time processed</span>
       </div>
@@ -133,18 +225,39 @@
         <span class="text-[10px] text-blue-300 font-medium">Daily velocity</span>
       </div>
       <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
-        <p class="text-[11px] font-medium text-slate-400">Connected Channels</p>
+        <p class="text-[11px] font-medium text-slate-400">Channels</p>
         <p class="text-xl font-bold text-white mt-1" id="mTotalChannels">0</p>
         <span class="text-[10px] text-slate-400" id="mActiveChannels">0 active</span>
       </div>
       <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
-        <p class="text-[11px] font-medium text-slate-400">Promo Target</p>
-        <p class="text-sm font-bold text-amber-400 mt-1 truncate" id="mPromoName">Bold Cinema</p>
-        <span class="text-[10px] text-emerald-400 font-medium">100% Active in DMs</span>
+        <p class="text-[11px] font-medium text-slate-400">Promo Slots</p>
+        <p class="text-xl font-bold text-amber-400 mt-1" id="mActiveSlotsCount">1 / 3</p>
+        <span class="text-[10px] text-amber-300 font-medium">Active in network DMs</span>
       </div>
     </div>
 
-    <!-- Master Channels Directory -->
+    <!-- Dynamic 3-Slot Co-Promotion Configurator -->
+    <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3.5">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-xs font-semibold text-white flex items-center gap-1.5">
+            <span>🔥</span> Dynamic Co-Promotion Engine
+          </h3>
+          <p class="text-[10px] text-slate-400">Configure up to 3 slots rotated across all subscriber DMs</p>
+        </div>
+      </div>
+
+      <!-- Slots List -->
+      <div class="space-y-3" id="promoSlotsContainer">
+        <!-- Rendered dynamically in JS -->
+      </div>
+
+      <button id="savePromoSlotsBtn" class="w-full py-2.5 px-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
+        Save Promo Rotation Slots
+      </button>
+    </div>
+
+    <!-- Master Channel Directory -->
     <div>
       <div class="flex items-center justify-between mb-2">
         <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Master Channel Network</h3>
@@ -154,17 +267,17 @@
       </div>
     </div>
 
-    <!-- Announcement / Broadcast Engine -->
+    <!-- Broadcast Engine -->
     <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3">
       <div class="flex items-center gap-2">
         <span class="text-base">📢</span>
         <div>
-          <h3 class="text-xs font-semibold text-white">Broadcast to Channel Admins</h3>
-          <p class="text-[10px] text-slate-400">Delivers a private message directly to all connected channel admins</p>
+          <h3 class="text-xs font-semibold text-white">Broadcast Announcement</h3>
+          <p class="text-[10px] text-slate-400">Sends an official update directly to all connected channel admins</p>
         </div>
       </div>
-      <textarea id="broadcastInput" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="Type administrative announcement or update..."></textarea>
-      <button id="sendBroadcastBtn" class="w-full py-2.5 px-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
+      <textarea id="broadcastInput" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="Type administrative announcement or update..."></textarea>
+      <button id="sendBroadcastBtn" class="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
         Dispatch Broadcast
       </button>
     </div>
@@ -194,20 +307,40 @@
     const noChannels = document.getElementById("noChannels");
     const channelForm = document.getElementById("channelForm");
     const channelSelect = document.getElementById("channelSelect");
+    const bannerIndicator = document.getElementById("bannerIndicator");
+    const bannerStatusText = document.getElementById("bannerStatusText");
+    const setBannerBtn = document.getElementById("setBannerBtn");
+    const removeBannerBtn = document.getElementById("removeBannerBtn");
+
     const customMessage = document.getElementById("customMessage");
-    const btnText = document.getElementById("btnText");
-    const btnUrl = document.getElementById("btnUrl");
+    const btn1Text = document.getElementById("btn1Text");
+    const btn1Url = document.getElementById("btn1Url");
+    const btn2Text = document.getElementById("btn2Text");
+    const btn2Url = document.getElementById("btn2Url");
+
+    const eventModeToggle = document.getElementById("eventModeToggle");
+    const eventMessageContainer = document.getElementById("eventMessageContainer");
+    const eventMessage = document.getElementById("eventMessage");
+    const silentDmToggle = document.getElementById("silentDmToggle");
+
+    // Preview Elements
+    const previewBannerBadge = document.getElementById("previewBannerBadge");
     const previewTitle = document.getElementById("previewTitle");
     const previewMessage = document.getElementById("previewMessage");
-    const previewCustomBtn = document.getElementById("previewCustomBtn");
+    const previewBtn1 = document.getElementById("previewBtn1");
+    const previewBtn2 = document.getElementById("previewBtn2");
+
     const saveBtn = document.getElementById("saveBtn");
+    const testDmBtn = document.getElementById("testDmBtn");
 
     // Owner Elements
     const mTotalJoins = document.getElementById("mTotalJoins");
     const m24hJoins = document.getElementById("m24hJoins");
     const mTotalChannels = document.getElementById("mTotalChannels");
     const mActiveChannels = document.getElementById("mActiveChannels");
-    const mPromoName = document.getElementById("mPromoName");
+    const mActiveSlotsCount = document.getElementById("mActiveSlotsCount");
+    const promoSlotsContainer = document.getElementById("promoSlotsContainer");
+    const savePromoSlotsBtn = document.getElementById("savePromoSlotsBtn");
     const masterChannelList = document.getElementById("masterChannelList");
     const channelCountLabel = document.getElementById("channelCountLabel");
     const broadcastInput = document.getElementById("broadcastInput");
@@ -216,6 +349,7 @@
     let isOwner = false;
     let myChannels = [];
     let currentChannel = null;
+    let promoSlots = [];
 
     async function init() {
       try {
@@ -252,41 +386,141 @@
       currentChannel = myChannels.find(c => String(c.chat_id) === String(chatId));
       if (!currentChannel) return;
 
-      customMessage.value = currentChannel.custom_message || "Welcome to the channel! Check out our pinned posts.";
-      btnText.value = currentChannel.custom_btn_text || "Official Channel";
-      btnUrl.value = currentChannel.custom_btn_url || "";
+      // Populate Inputs
+      customMessage.value = currentChannel.custom_message || "Welcome to {channel}! Your request has been approved.";
+      btn1Text.value = currentChannel.custom_btn_text || `📢 ${currentChannel.chat_title}`;
+      btn1Url.value = currentChannel.custom_btn_url || "";
+      btn2Text.value = currentChannel.custom_btn_2_text || "";
+      btn2Url.value = currentChannel.custom_btn_2_url || "";
+
+      eventModeToggle.checked = !!currentChannel.event_mode_enabled;
+      eventMessage.value = currentChannel.event_message || "";
+      silentDmToggle.checked = !!currentChannel.silent_dm;
+
+      toggleEventContainer(eventModeToggle.checked);
+      updateBannerUI();
       updatePreview();
+    }
+
+    function updateBannerUI() {
+      if (currentChannel.banner_file_id) {
+        bannerIndicator.className = "h-2 w-2 rounded-full bg-emerald-400";
+        bannerStatusText.innerText = "Banner: Photo Active";
+        previewBannerBadge.classList.remove("hidden");
+        removeBannerBtn.classList.remove("hidden");
+      } else {
+        bannerIndicator.className = "h-2 w-2 rounded-full bg-slate-600";
+        bannerStatusText.innerText = "Banner: Text-only";
+        previewBannerBadge.classList.add("hidden");
+        removeBannerBtn.classList.add("hidden");
+      }
+    }
+
+    function toggleEventContainer(enabled) {
+      if (enabled) {
+        eventMessageContainer.classList.remove("hidden");
+      } else {
+        eventMessageContainer.classList.add("hidden");
+      }
     }
 
     function updatePreview() {
       if (!currentChannel) return;
+
       previewTitle.innerText = `🎉 Request Approved for ${currentChannel.chat_title}!`;
-      previewMessage.innerText = customMessage.value.trim() || "Welcome to the channel!";
-      previewCustomBtn.innerText = btnText.value.trim() || "Official Channel";
-      if (!btnUrl.value.trim()) {
-        previewCustomBtn.classList.add("hidden");
+
+      // Event mode preview takes priority if enabled and filled
+      if (eventModeToggle.checked && eventMessage.value.trim()) {
+        previewMessage.innerText = eventMessage.value.trim()
+          .replace("{name}", user.first_name || "there")
+          .replace("{channel}", currentChannel.chat_title);
       } else {
-        previewCustomBtn.classList.remove("hidden");
+        previewMessage.innerText = (customMessage.value.trim() || "Welcome to {channel}!")
+          .replace("{name}", user.first_name || "there")
+          .replace("{channel}", currentChannel.chat_title);
+      }
+
+      // Button 1
+      previewBtn1.innerText = btn1Text.value.trim() || `📢 ${currentChannel.chat_title}`;
+
+      // Button 2
+      if (btn2Text.value.trim() && btn2Url.value.trim()) {
+        previewBtn2.innerText = btn2Text.value.trim();
+        previewBtn2.classList.remove("hidden");
+      } else {
+        previewBtn2.classList.add("hidden");
       }
     }
 
+    // Input Listeners
     customMessage.addEventListener("input", updatePreview);
-    btnText.addEventListener("input", updatePreview);
-    btnUrl.addEventListener("input", updatePreview);
+    btn1Text.addEventListener("input", updatePreview);
+    btn1Url.addEventListener("input", updatePreview);
+    btn2Text.addEventListener("input", updatePreview);
+    btn2Url.addEventListener("input", updatePreview);
+    eventMessage.addEventListener("input", updatePreview);
+
+    eventModeToggle.addEventListener("change", (e) => {
+      toggleEventContainer(e.target.checked);
+      updatePreview();
+    });
+
     channelSelect.addEventListener("change", (e) => selectChannel(e.target.value));
 
-    // Save channel configuration
+    // Tag Insertion
+    window.insertTag = function(tag) {
+      const pos = customMessage.selectionStart;
+      const val = customMessage.value;
+      customMessage.value = val.substring(0, pos) + tag + val.substring(pos);
+      customMessage.focus();
+      customMessage.setSelectionRange(pos + tag.length, pos + tag.length);
+      updatePreview();
+    };
+
+    // Photo Banner Deep Link Flow
+    setBannerBtn.addEventListener("click", () => {
+      if (!currentChannel) return;
+      const botDeepLink = `https://t.me/AutoRequestAcceptorxBot?start=setbanner_${currentChannel.chat_id}`;
+      if (tg && tg.openTelegramLink) {
+        tg.openTelegramLink(botDeepLink);
+        tg.close();
+      } else {
+        window.open(botDeepLink, "_blank");
+      }
+    });
+
+    removeBannerBtn.addEventListener("click", async () => {
+      if (!currentChannel || !confirm("Remove photo banner and revert to clean text?")) return;
+      try {
+        const botDeepLink = `https://t.me/AutoRequestAcceptorxBot?start=removebanner_${currentChannel.chat_id}`;
+        if (tg && tg.openTelegramLink) {
+          tg.openTelegramLink(botDeepLink);
+          tg.close();
+        } else {
+          window.open(botDeepLink, "_blank");
+        }
+      } catch (e) {
+        alert("Action could not be executed.");
+      }
+    });
+
+    // Save Channel Configuration
     saveBtn.addEventListener("click", async () => {
       if (!currentChannel) return;
       saveBtn.disabled = true;
-      saveBtn.innerText = "Saving changes...";
+      saveBtn.innerText = "Saving configuration...";
 
       const payload = {
         chat_id: currentChannel.chat_id,
         admin_id: user.id,
         custom_message: customMessage.value.trim(),
-        custom_btn_text: btnText.value.trim(),
-        custom_btn_url: btnUrl.value.trim()
+        custom_btn_text: btn1Text.value.trim(),
+        custom_btn_url: btn1Url.value.trim(),
+        custom_btn_2_text: btn2Text.value.trim(),
+        custom_btn_2_url: btn2Url.value.trim(),
+        event_mode_enabled: eventModeToggle.checked,
+        event_message: eventMessage.value.trim(),
+        silent_dm: silentDmToggle.checked
       };
 
       try {
@@ -297,9 +531,7 @@
         });
         const result = await res.json();
         if (result.success) {
-          currentChannel.custom_message = payload.custom_message;
-          currentChannel.custom_btn_text = payload.custom_btn_text;
-          currentChannel.custom_btn_url = payload.custom_btn_url;
+          Object.assign(currentChannel, payload);
           tg?.HapticFeedback?.notificationOccurred("success");
           alert("Channel configuration updated successfully!");
         } else {
@@ -313,22 +545,49 @@
       }
     });
 
+    // Send Live Test DM
+    testDmBtn.addEventListener("click", async () => {
+      if (!currentChannel) return;
+      testDmBtn.disabled = true;
+      testDmBtn.innerText = "Dispatching preview...";
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/channel/test-dm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: currentChannel.chat_id, admin_id: user.id })
+        });
+        const result = await res.json();
+        if (result.success) {
+          tg?.HapticFeedback?.notificationOccurred("success");
+          alert("🧪 Test card sent to your private Telegram chat!");
+        } else {
+          alert("Test failed: " + (result.error || "Check if bot is started in DM."));
+        }
+      } catch (e) {
+        alert("Failed to communicate with bot.");
+      } finally {
+        testDmBtn.disabled = false;
+        testDmBtn.innerText = "📲 Send Test DM to My Telegram";
+      }
+    });
+
     // Tab Navigation
     tabChannelBtn.addEventListener("click", () => {
-      tabChannelBtn.className = "py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white transition-all";
+      tabChannelBtn.className = "py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white transition-all shadow-sm";
       tabOwnerBtn.className = "py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
       channelSection.classList.remove("hidden");
       ownerSection.classList.add("hidden");
     });
 
     tabOwnerBtn.addEventListener("click", () => {
-      tabOwnerBtn.className = "py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white transition-all";
+      tabOwnerBtn.className = "py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white transition-all shadow-sm";
       tabChannelBtn.className = "py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
       channelSection.classList.add("hidden");
       ownerSection.classList.remove("hidden");
     });
 
-    // Load Owner Data
+    // Load Owner Data & 3 Slots
     async function loadOwnerDashboard() {
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/data/${user.id}`);
@@ -339,10 +598,30 @@
         m24hJoins.innerText = "+" + (data.metrics.joins_24h || 0).toLocaleString();
         mTotalChannels.innerText = data.metrics.total_channels || 0;
         mActiveChannels.innerText = `${data.metrics.active_channels || 0} active`;
-        mPromoName.innerText = data.metrics.promo_name || "Bold Cinema";
+
+        promoSlots = data.promo_slots || [];
+        const activeCount = promoSlots.filter(s => s.is_active).length;
+        mActiveSlotsCount.innerText = `${activeCount} / ${promoSlots.length}`;
         channelCountLabel.innerText = `${data.channels.length} Channels`;
 
-        // Render Master Channel Directory
+        // Render Promo Slots Configurator
+        promoSlotsContainer.innerHTML = promoSlots.map(slot => `
+          <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-white">Slot ${slot.slot_id}</span>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="slotActive_${slot.slot_id}" class="sr-only peer" ${slot.is_active ? 'checked' : ''}>
+                <div class="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-amber-600"></div>
+              </label>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <input type="text" id="slotText_${slot.slot_id}" class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500" value="${slot.btn_text || ''}" placeholder="Button Title">
+              <input type="url" id="slotUrl_${slot.slot_id}" class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500" value="${slot.btn_url || ''}" placeholder="https://...">
+            </div>
+          </div>
+        `).join("");
+
+        // Render Master Channels
         masterChannelList.innerHTML = data.channels.map(ch => `
           <div class="p-3 flex items-center justify-between gap-3 text-xs">
             <div class="truncate">
@@ -354,12 +633,47 @@
             </button>
           </div>
         `).join("");
+
       } catch (err) {
         console.error("Owner load error:", err);
       }
     }
 
-    // Toggle Channel Active/Paused
+    // Save Promo Slots
+    savePromoSlotsBtn.addEventListener("click", async () => {
+      savePromoSlotsBtn.disabled = true;
+      savePromoSlotsBtn.innerText = "Updating slots...";
+
+      const updatedSlots = promoSlots.map(slot => ({
+        slot_id: slot.slot_id,
+        btn_text: document.getElementById(`slotText_${slot.slot_id}`).value.trim(),
+        btn_url: document.getElementById(`slotUrl_${slot.slot_id}`).value.trim(),
+        is_active: document.getElementById(`slotActive_${slot.slot_id}`).checked
+      }));
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/promo-slots`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ admin_id: user.id, slots: updatedSlots })
+        });
+        const result = await res.json();
+        if (result.success) {
+          tg?.HapticFeedback?.notificationOccurred("success");
+          alert("Owner co-promotion rotation slots updated!");
+          loadOwnerDashboard();
+        } else {
+          alert("Failed to update slots: " + (result.error || ""));
+        }
+      } catch (e) {
+        alert("Network communication error.");
+      } finally {
+        savePromoSlotsBtn.disabled = false;
+        savePromoSlotsBtn.innerText = "Save Promo Rotation Slots";
+      }
+    });
+
+    // Toggle Channel
     window.toggleChannel = async function(chatId, newStatus) {
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/toggle-channel`, {
@@ -376,16 +690,13 @@
       }
     };
 
-    // Send Broadcast Announcement
+    // Broadcast
     sendBroadcastBtn.addEventListener("click", async () => {
       const msg = broadcastInput.value.trim();
-      if (!msg) {
-        alert("Please enter a message to broadcast.");
-        return;
-      }
+      if (!msg) return alert("Please enter an announcement.");
 
       sendBroadcastBtn.disabled = true;
-      sendBroadcastBtn.innerText = "Dispatching broadcast...";
+      sendBroadcastBtn.innerText = "Dispatching...";
 
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/broadcast`, {
@@ -395,12 +706,12 @@
         });
         const result = await res.json();
         if (result.success) {
-          alert(`Broadcast delivered to ${result.delivered} / ${result.total_admins} channel admins.`);
+          alert(`Delivered to ${result.delivered} / ${result.total_admins} admins.`);
           broadcastInput.value = "";
         } else {
-          alert("Error: " + (result.error || "Broadcast failed."));
+          alert("Broadcast failed.");
         }
-      } catch (err) {
+      } catch (e) {
         alert("Broadcast communication error.");
       } finally {
         sendBroadcastBtn.disabled = false;
