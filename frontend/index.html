@@ -16,324 +16,347 @@
 </head>
 <body class="p-4 pb-20 max-w-lg mx-auto">
 
-  <!-- Top Bar -->
-  <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-    <div>
-      <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-        <span>⚡</span> Control Center
-      </h1>
-      <p class="text-[11px] text-slate-400">@AutoRequestAcceptorxBot Hub</p>
+  <!-- ========================================== -->
+  <!-- LOCKED STATE (OUTSIDE TELEGRAM BROWSER)    -->
+  <!-- ========================================== -->
+  <div id="unauthorizedScreen" class="hidden py-20 text-center space-y-4">
+    <div class="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-rose-500/10 border border-rose-500/20 text-3xl">
+      🔒
     </div>
-    <span id="roleBadge" class="text-[11px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full font-medium">
-      Admin
-    </span>
-  </div>
-
-  <!-- Role-Based Navigation (Owner Exclusive) -->
-  <div id="ownerNav" class="hidden grid grid-cols-2 gap-2 bg-slate-900/90 p-1 rounded-xl border border-slate-800 mb-5">
-    <button id="tabChannelBtn" class="py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white transition-all shadow-sm">
-      📢 Channel Hub
-    </button>
-    <button id="tabOwnerBtn" class="py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">
-      👑 Owner HQ
-    </button>
-  </div>
-
-  <!-- Loading State -->
-  <div id="loading" class="py-12 text-center text-slate-400 text-sm">
-    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-3"></div>
-    <p>Loading channel configurations...</p>
-  </div>
-
-  <!-- ========================================== -->
-  <!-- TAB 1: CHANNEL ADMIN SETTINGS              -->
-  <!-- ========================================== -->
-  <div id="channelSection" class="hidden space-y-5">
-    
-    <!-- No Channels State -->
-    <div id="noChannels" class="hidden bg-slate-900/60 border border-slate-800 rounded-2xl p-6 text-center">
-      <div class="text-3xl mb-2">📢</div>
-      <h3 class="text-sm font-semibold text-white mb-1">No Channels Connected</h3>
-      <p class="text-xs text-slate-400 leading-relaxed">
-        Add <b>@AutoRequestAcceptorxBot</b> as an <b>Administrator</b> with <i>Invite Users</i> permission in your channel to begin.
+    <div class="space-y-1.5 px-4">
+      <h2 class="text-base font-bold text-white tracking-tight">Access Restricted</h2>
+      <p class="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+        This control dashboard can only be accessed securely from within Telegram.
       </p>
     </div>
-
-    <div id="channelForm" class="space-y-5 hidden">
-      
-      <!-- Channel Selector & Banner Status -->
-      <div class="space-y-2">
-        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Target Channel</label>
-        <select id="channelSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
-        </select>
-        
-        <!-- Banner Status Bar -->
-        <div class="flex items-center justify-between bg-slate-900/70 border border-slate-800 px-3.5 py-2.5 rounded-xl text-xs">
-          <div class="flex items-center gap-2">
-            <span id="bannerIndicator" class="h-2 w-2 rounded-full bg-slate-600"></span>
-            <span id="bannerStatusText" class="text-slate-300">Banner: Text-only</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <button id="setBannerBtn" class="text-[11px] font-semibold text-blue-400 hover:text-blue-300 transition-colors">
-              📸 Set Photo
-            </button>
-            <span class="text-slate-700">|</span>
-            <button id="removeBannerBtn" class="text-[11px] font-semibold text-rose-400 hover:text-rose-300 transition-colors">
-              Remove
-            </button>
-          </div>
-        </div>
+    <div class="pt-2">
+      <div class="inline-block bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-[11px] text-slate-300">
+        Open <b class="text-blue-400">@AutoRequestAcceptorxBot</b> and send <code class="bg-slate-800 px-1.5 py-0.5 rounded text-amber-300">/settings</code>
       </div>
+    </div>
+  </div>
 
-      <!-- Live Mobile DM Preview -->
+  <!-- ========================================== -->
+  <!-- MAIN APP CONTAINER (ONLY IN TELEGRAM TMA)  -->
+  <!-- ========================================== -->
+  <div id="appContainer" class="hidden">
+    
+    <!-- Top Bar -->
+    <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
       <div>
-        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Subscriber DM Preview</label>
-        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 shadow-xl">
-          <div class="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50 space-y-2.5">
-            
-            <div id="previewBannerBadge" class="hidden bg-blue-500/20 text-blue-300 text-[10px] px-2.5 py-1 rounded-md text-center font-semibold">
-              🖼️ PHOTO BANNER ATTACHED
-            </div>
+        <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+          <span>⚡</span> Control Center
+        </h1>
+        <p class="text-[11px] text-slate-400">@AutoRequestAcceptorxBot Hub</p>
+      </div>
+      <span id="roleBadge" class="text-[11px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full font-medium">
+        Admin
+      </span>
+    </div>
 
-            <p class="text-xs font-semibold text-blue-400" id="previewTitle">🎉 Request Approved!</p>
-            <p class="text-xs text-slate-200 whitespace-pre-line leading-relaxed" id="previewMessage">Welcome to the channel!</p>
-            
-            <div class="pt-2 border-t border-slate-700/60 space-y-1.5">
-              <button id="previewBtn1" class="w-full py-2 px-3 text-xs font-medium text-center bg-blue-600 text-white rounded-lg pointer-events-none truncate">
-                📢 Official Channel
-              </button>
-              <button id="previewBtn2" class="hidden w-full py-2 px-3 text-xs font-medium text-center bg-slate-700/80 text-white rounded-lg pointer-events-none truncate">
-                Secondary Button
-              </button>
-              <button disabled class="w-full py-2 px-3 text-xs font-medium text-center bg-slate-800 text-slate-300 border border-slate-700 rounded-lg opacity-85 cursor-not-allowed truncate">
-                🔥 Network Co-Promotion Slot
-              </button>
-            </div>
-            <p class="text-[10px] text-slate-400 text-center font-medium">⚡ Auto-Approved via @AutoRequestAcceptorxBot</p>
-          </div>
-        </div>
+    <!-- Role-Based Navigation (Owner Exclusive) -->
+    <div id="ownerNav" class="hidden grid grid-cols-2 gap-2 bg-slate-900/90 p-1 rounded-xl border border-slate-800 mb-5">
+      <button id="tabChannelBtn" class="py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white transition-all shadow-sm">
+        📢 Channel Hub
+      </button>
+      <button id="tabOwnerBtn" class="py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">
+        👑 Owner HQ
+      </button>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading" class="py-12 text-center text-slate-400 text-sm">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-3"></div>
+      <p>Verifying secure session...</p>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 1: CHANNEL ADMIN SETTINGS              -->
+    <!-- ========================================== -->
+    <div id="channelSection" class="hidden space-y-5">
+      
+      <!-- No Channels Connected State -->
+      <div id="noChannels" class="hidden bg-slate-900/60 border border-slate-800 rounded-2xl p-6 text-center">
+        <div class="text-3xl mb-2">📢</div>
+        <h3 class="text-sm font-semibold text-white mb-1">No Channels Connected</h3>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Add <b>@AutoRequestAcceptorxBot</b> as an <b>Administrator</b> with <i>Invite Users</i> permission in your channel to begin.
+        </p>
       </div>
 
-      <!-- Welcome Message & Template Variables -->
-      <div class="space-y-2">
-        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Standard Welcome Message</label>
-        <textarea id="customMessage" rows="3" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 leading-relaxed" placeholder="Welcome {name}! Your request has been approved."></textarea>
+      <div id="channelForm" class="space-y-5 hidden">
         
-        <!-- Variable Helper Chips -->
-        <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
-          <span class="text-[10px] text-slate-500 font-medium">Insert tag:</span>
-          <button type="button" onclick="insertTag('{name}')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-0.5 rounded-md font-mono border border-slate-700/80">{name}</button>
-          <button type="button" onclick="insertTag('{channel}')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-0.5 rounded-md font-mono border border-slate-700/80">{channel}</button>
-          <button type="button" onclick="insertTag('{username}')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-0.5 rounded-md font-mono border border-slate-700/80">{username}</button>
-          <button type="button" onclick="insertTag('{time}')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-0.5 rounded-md font-mono border border-slate-700/80">{time}</button>
-        </div>
-      </div>
-
-      <!-- Dual Smart Buttons -->
-      <div class="space-y-3 bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl">
-        <p class="text-xs font-semibold text-slate-300">Custom Inline Buttons</p>
-        
-        <!-- Button 1 -->
-        <div class="space-y-1.5">
-          <label class="block text-[11px] font-medium text-slate-400">Primary Button</label>
-          <div class="grid grid-cols-2 gap-2">
-            <input type="text" id="btn1Text" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="Button Title">
-            <input type="url" id="btn1Url" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="https://t.me/...">
+        <!-- Channel Selector & Banner Status -->
+        <div class="space-y-2">
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Target Channel</label>
+          <select id="channelSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+          </select>
+          
+          <!-- Banner Status Bar -->
+          <div class="flex items-center justify-between bg-slate-900/70 border border-slate-800 px-3.5 py-2.5 rounded-xl text-xs">
+            <div class="flex items-center gap-2">
+              <span id="bannerIndicator" class="h-2 w-2 rounded-full bg-slate-600"></span>
+              <span id="bannerStatusText" class="text-slate-300">Banner: Text-only</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="setBannerBtn" class="text-[11px] font-semibold text-blue-400 hover:text-blue-300 transition-colors">
+                📸 Set Photo
+              </button>
+              <span class="text-slate-700">|</span>
+              <button id="removeBannerBtn" class="text-[11px] font-semibold text-rose-400 hover:text-rose-300 transition-colors">
+                Remove
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Button 2 -->
-        <div class="space-y-1.5 pt-2 border-t border-slate-800">
-          <label class="block text-[11px] font-medium text-slate-400">Secondary Button (Optional)</label>
-          <div class="grid grid-cols-2 gap-2">
-            <input type="text" id="btn2Text" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="e.g. VIP Group / Website">
-            <input type="url" id="btn2Url" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="https://...">
+        <!-- Live Mobile DM Preview -->
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Subscriber DM Preview</label>
+          <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 shadow-xl">
+            <div class="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50 space-y-2.5">
+              
+              <div id="previewBannerBadge" class="hidden bg-blue-500/20 text-blue-300 text-[10px] px-2.5 py-1 rounded-md text-center font-semibold">
+                🖼️ PHOTO BANNER ATTACHED
+              </div>
+
+              <p class="text-xs font-semibold text-blue-400" id="previewTitle">🎉 Request Approved!</p>
+              <p class="text-xs text-slate-200 whitespace-pre-line leading-relaxed" id="previewMessage">Welcome to the channel!</p>
+              
+              <div class="pt-2 border-t border-slate-700/60 space-y-1.5">
+                <button id="previewBtn1" class="w-full py-2 px-3 text-xs font-medium text-center bg-blue-600 text-white rounded-lg pointer-events-none truncate">
+                  📢 Official Channel
+                </button>
+                <button id="previewBtn2" class="hidden w-full py-2 px-3 text-xs font-medium text-center bg-slate-700/80 text-white rounded-lg pointer-events-none truncate">
+                  Secondary Button
+                </button>
+                <button disabled class="w-full py-2 px-3 text-xs font-medium text-center bg-slate-800 text-slate-300 border border-slate-700 rounded-lg opacity-85 cursor-not-allowed truncate">
+                  🔥 Network Co-Promotion Slot
+                </button>
+              </div>
+              <p class="text-[10px] text-slate-400 text-center font-medium">⚡ Auto-Approved via @AutoRequestAcceptorxBot</p>
+            </div>
           </div>
+        </div>
+
+        <!-- Welcome Message & Template Variables -->
+        <div class="space-y-2">
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Standard Welcome Message</label>
+          <textarea id="customMessage" rows="3" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 leading-relaxed" placeholder="Welcome {name}! Your request has been approved."></textarea>
+          
+          <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span class="text-[10px] text-slate-500 font-medium">Insert tag:</span>
+            <button type="button" onclick="insertTag('{name}')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-0.5 rounded-md font-mono border border-slate-700/80">{name}</button>
+            <button type="button" onclick="insertTag('{channel}')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-0.5 rounded-md font-mono border border-slate-700/80">{channel}</button>
+            <button type="button" onclick="insertTag('{username}')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-0.5 rounded-md font-mono border border-slate-700/80">{username}</button>
+            <button type="button" onclick="insertTag('{time}')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-0.5 rounded-md font-mono border border-slate-700/80">{time}</button>
+          </div>
+        </div>
+
+        <!-- Dual Smart Buttons -->
+        <div class="space-y-3 bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl">
+          <p class="text-xs font-semibold text-slate-300">Custom Inline Buttons</p>
+          
+          <div class="space-y-1.5">
+            <label class="block text-[11px] font-medium text-slate-400">Primary Button</label>
+            <div class="grid grid-cols-2 gap-2">
+              <input type="text" id="btn1Text" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="Button Title">
+              <input type="url" id="btn1Url" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="https://t.me/...">
+            </div>
+          </div>
+
+          <div class="space-y-1.5 pt-2 border-t border-slate-800">
+            <label class="block text-[11px] font-medium text-slate-400">Secondary Button (Optional)</label>
+            <div class="grid grid-cols-2 gap-2">
+              <input type="text" id="btn2Text" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="e.g. VIP Group / Website">
+              <input type="url" id="btn2Url" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="https://...">
+            </div>
+          </div>
+        </div>
+
+        <!-- Event / Match-Day Mode -->
+        <div class="bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h4 class="text-xs font-semibold text-white flex items-center gap-1.5">
+                <span>⚡</span> Event / Match-Day Mode
+              </h4>
+              <p class="text-[10px] text-slate-400">Temporarily override welcome text with high-urgency copy</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="eventModeToggle" class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+            </label>
+          </div>
+
+          <div id="eventMessageContainer" class="hidden pt-2 border-t border-slate-800 space-y-1.5">
+            <label class="block text-[11px] font-medium text-amber-400">Event Message Copy</label>
+            <textarea id="eventMessage" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="🚨 MATCH DAY SPECIAL: Predictions are live! Tap below to open today's card."></textarea>
+          </div>
+        </div>
+
+        <!-- Operational Toggles: Silent DM & Anti-Bot Shield -->
+        <div class="grid grid-cols-1 gap-2.5">
+          <div class="flex items-center justify-between bg-slate-900/60 border border-slate-800 px-3.5 py-2.5 rounded-2xl">
+            <div>
+              <h4 class="text-xs font-semibold text-white">🔕 Silent DM Delivery</h4>
+              <p class="text-[10px] text-slate-400">Delivers card without sound/vibration alerts</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="silentDmToggle" class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+
+          <div class="flex items-center justify-between bg-slate-900/60 border border-slate-800 px-3.5 py-2.5 rounded-2xl">
+            <div>
+              <h4 class="text-xs font-semibold text-white">🛡️ Anti-Bot & Scraper Shield</h4>
+              <p class="text-[10px] text-slate-400">Rejects automated userbots and flood patterns</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="antiBotToggle" class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Save & Test Actions -->
+        <div class="space-y-2 pt-1">
+          <button id="saveBtn" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all shadow-lg shadow-blue-600/20 active:scale-[0.99]">
+            Save Channel Configuration
+          </button>
+          <button id="testDmBtn" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
+            📲 Send Test DM to My Telegram
+          </button>
+        </div>
+
+        <!-- Campaign Link Analytics -->
+        <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h4 class="text-xs font-semibold text-white flex items-center gap-1.5">
+                <span>📊</span> Campaign Link Attribution
+              </h4>
+              <p class="text-[10px] text-slate-400">Join conversions per invite link name</p>
+            </div>
+            <button id="refreshAnalyticsBtn" class="text-[10px] text-blue-400 font-semibold hover:underline">Refresh</button>
+          </div>
+          <div id="analyticsList" class="space-y-2 text-xs">
+            <p class="text-slate-500 text-[11px]">Loading conversion data...</p>
+          </div>
+        </div>
+
+        <!-- Disaster Recovery / Audience Vault -->
+        <div class="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 space-y-2.5">
+          <div class="flex items-center gap-2">
+            <span class="text-base">🚨</span>
+            <div>
+              <h4 class="text-xs font-semibold text-white">Audience Vault & Disaster Recovery</h4>
+              <p class="text-[10px] text-slate-400">Channel banned? Request emergency migration DM to past subscribers</p>
+            </div>
+          </div>
+          <div class="space-y-2 pt-1">
+            <input type="url" id="migrationTargetInput" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500" placeholder="https://t.me/your_new_backup_channel">
+            <button id="requestMigrationBtn" class="w-full py-2 px-3 bg-rose-600/80 hover:bg-rose-600 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
+              Submit Migration Request
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 2: OWNER HQ (STRICTLY OWNER ONLY)      -->
+    <!-- ========================================== -->
+    <div id="ownerSection" class="hidden space-y-6">
+      
+      <!-- Telemetry Cards -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
+          <p class="text-[11px] font-medium text-slate-400">Total Network Joins</p>
+          <p class="text-xl font-bold text-white mt-1" id="mTotalJoins">0</p>
+          <span class="text-[10px] text-emerald-400 font-medium">All-time processed</span>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
+          <p class="text-[11px] font-medium text-slate-400">Joins (Last 24h)</p>
+          <p class="text-xl font-bold text-blue-400 mt-1" id="m24hJoins">0</p>
+          <span class="text-[10px] text-blue-300 font-medium">Daily velocity</span>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
+          <p class="text-[11px] font-medium text-slate-400">Channels</p>
+          <p class="text-xl font-bold text-white mt-1" id="mTotalChannels">0</p>
+          <span class="text-[10px] text-slate-400" id="mActiveChannels">0 active</span>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
+          <p class="text-[11px] font-medium text-slate-400">Active Promo Slots</p>
+          <p class="text-xl font-bold text-amber-400 mt-1" id="mActiveSlotsCount">1 / 3</p>
+          <span class="text-[10px] text-amber-300 font-medium">Rotated in subscriber DMs</span>
         </div>
       </div>
 
-      <!-- Event / Match-Day Mode -->
-      <div class="bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl space-y-3">
-        <div class="flex items-center justify-between">
-          <div>
-            <h4 class="text-xs font-semibold text-white flex items-center gap-1.5">
-              <span>⚡</span> Event / Match-Day Mode
-            </h4>
-            <p class="text-[10px] text-slate-400">Temporarily override welcome text with high-urgency event copy</p>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="eventModeToggle" class="sr-only peer">
-            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
-          </label>
-        </div>
-
-        <div id="eventMessageContainer" class="hidden pt-2 border-t border-slate-800 space-y-1.5">
-          <label class="block text-[11px] font-medium text-amber-400">Event Message Copy</label>
-          <textarea id="eventMessage" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="🚨 MATCH DAY SPECIAL: Predictions are live! Tap below to open today's card."></textarea>
-        </div>
-      </div>
-
-      <!-- Operational Toggles: Silent DM & Anti-Bot Shield -->
-      <div class="grid grid-cols-1 gap-2.5">
-        <div class="flex items-center justify-between bg-slate-900/60 border border-slate-800 px-3.5 py-2.5 rounded-2xl">
-          <div>
-            <h4 class="text-xs font-semibold text-white">🔕 Silent DM Delivery</h4>
-            <p class="text-[10px] text-slate-400">Delivers card without sound/vibration alerts</p>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="silentDmToggle" class="sr-only peer">
-            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-          </label>
-        </div>
-
-        <div class="flex items-center justify-between bg-slate-900/60 border border-slate-800 px-3.5 py-2.5 rounded-2xl">
-          <div>
-            <h4 class="text-xs font-semibold text-white">🛡️ Anti-Bot & Scraper Shield</h4>
-            <p class="text-[10px] text-slate-400">Rejects automated userbots and flood patterns</p>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="antiBotToggle" class="sr-only peer">
-            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-          </label>
-        </div>
-      </div>
-
-      <!-- Save & Test Actions -->
-      <div class="space-y-2 pt-1">
-        <button id="saveBtn" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all shadow-lg shadow-blue-600/20 active:scale-[0.99]">
-          Save Channel Configuration
-        </button>
-        <button id="testDmBtn" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
-          📲 Send Test DM to My Telegram
-        </button>
-      </div>
-
-      <!-- Campaign Link Analytics -->
-      <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 space-y-3">
-        <div class="flex items-center justify-between">
-          <div>
-            <h4 class="text-xs font-semibold text-white flex items-center gap-1.5">
-              <span>📊</span> Campaign Link Attribution
-            </h4>
-            <p class="text-[10px] text-slate-400">Join conversions per invite link name</p>
-          </div>
-          <button id="refreshAnalyticsBtn" class="text-[10px] text-blue-400 font-semibold hover:underline">Refresh</button>
-        </div>
-        <div id="analyticsList" class="space-y-2 text-xs">
-          <p class="text-slate-500 text-[11px]">Loading conversion data...</p>
-        </div>
-      </div>
-
-      <!-- Disaster Recovery / Audience Vault -->
-      <div class="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 space-y-2.5">
+      <!-- Audience Vault Review Queue -->
+      <div id="pendingMigrationsCard" class="hidden bg-rose-950/20 border border-rose-800/50 rounded-2xl p-4 space-y-3">
         <div class="flex items-center gap-2">
           <span class="text-base">🚨</span>
           <div>
-            <h4 class="text-xs font-semibold text-white">Audience Vault & Disaster Recovery</h4>
-            <p class="text-[10px] text-slate-400">Channel banned? Request emergency migration DM to past subscribers</p>
+            <h3 class="text-xs font-semibold text-rose-300">Pending Migration Requests</h3>
+            <p class="text-[10px] text-slate-400">Channel admins requesting emergency broadcast to subscribers</p>
           </div>
         </div>
-        <div class="space-y-2 pt-1">
-          <input type="url" id="migrationTargetInput" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500" placeholder="https://t.me/your_new_backup_channel">
-          <button id="requestMigrationBtn" class="w-full py-2 px-3 bg-rose-600/80 hover:bg-rose-600 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
-            Submit Migration Request
-          </button>
-        </div>
+        <div id="migrationQueueList" class="space-y-2 text-xs"></div>
       </div>
 
-    </div>
-  </div>
-
-  <!-- ========================================== -->
-  <!-- TAB 2: OWNER HQ (RESTRICTED TO OWNER_ID)   -->
-  <!-- ========================================== -->
-  <div id="ownerSection" class="hidden space-y-6">
-    
-    <!-- Telemetry Cards -->
-    <div class="grid grid-cols-2 gap-3">
-      <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
-        <p class="text-[11px] font-medium text-slate-400">Total Network Joins</p>
-        <p class="text-xl font-bold text-white mt-1" id="mTotalJoins">0</p>
-        <span class="text-[10px] text-emerald-400 font-medium">All-time processed</span>
-      </div>
-      <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
-        <p class="text-[11px] font-medium text-slate-400">Joins (Last 24h)</p>
-        <p class="text-xl font-bold text-blue-400 mt-1" id="m24hJoins">0</p>
-        <span class="text-[10px] text-blue-300 font-medium">Daily velocity</span>
-      </div>
-      <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
-        <p class="text-[11px] font-medium text-slate-400">Channels</p>
-        <p class="text-xl font-bold text-white mt-1" id="mTotalChannels">0</p>
-        <span class="text-[10px] text-slate-400" id="mActiveChannels">0 active</span>
-      </div>
-      <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
-        <p class="text-[11px] font-medium text-slate-400">Active Promo Slots</p>
-        <p class="text-xl font-bold text-amber-400 mt-1" id="mActiveSlotsCount">1 / 3</p>
-        <span class="text-[10px] text-amber-300 font-medium">Rotated in subscriber DMs</span>
-      </div>
-    </div>
-
-    <!-- Audience Vault Review Queue -->
-    <div id="pendingMigrationsCard" class="hidden bg-rose-950/20 border border-rose-800/50 rounded-2xl p-4 space-y-3">
-      <div class="flex items-center gap-2">
-        <span class="text-base">🚨</span>
+      <!-- Dynamic 3-Slot Co-Promotion Rotator -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3.5">
         <div>
-          <h3 class="text-xs font-semibold text-rose-300">Pending Migration Requests</h3>
-          <p class="text-[10px] text-slate-400">Channel admins requesting emergency broadcast to subscribers</p>
+          <h3 class="text-xs font-semibold text-white flex items-center gap-1.5">
+            <span>🔥</span> Dynamic Co-Promotion Engine
+          </h3>
+          <p class="text-[10px] text-slate-400">Configure up to 3 slots rotated randomly across all subscriber DMs</p>
         </div>
-      </div>
-      <div id="migrationQueueList" class="space-y-2 text-xs"></div>
-    </div>
 
-    <!-- Dynamic 3-Slot Co-Promotion Rotator -->
-    <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3.5">
-      <div>
-        <h3 class="text-xs font-semibold text-white flex items-center gap-1.5">
-          <span>🔥</span> Dynamic Co-Promotion Engine
-        </h3>
-        <p class="text-[10px] text-slate-400">Configure up to 3 slots rotated randomly across all subscriber DMs</p>
+        <div class="space-y-3" id="promoSlotsContainer"></div>
+
+        <button id="savePromoSlotsBtn" class="w-full py-2.5 px-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
+          Save Promo Rotation Slots
+        </button>
       </div>
 
-      <div class="space-y-3" id="promoSlotsContainer"></div>
-
-      <button id="savePromoSlotsBtn" class="w-full py-2.5 px-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
-        Save Promo Rotation Slots
-      </button>
-    </div>
-
-    <!-- Master Admin Directory -->
-    <div class="space-y-2">
-      <div class="flex items-center justify-between">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Admins Directory</h3>
-        <span class="text-[11px] text-slate-500" id="adminCountLabel">0 Admins</span>
-      </div>
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800 max-h-56 overflow-y-auto" id="masterAdminList"></div>
-    </div>
-
-    <!-- Master Channel Network -->
-    <div class="space-y-2">
-      <div class="flex items-center justify-between">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Channels Directory</h3>
-        <span class="text-[11px] text-slate-500" id="channelCountLabel">0 Channels</span>
-      </div>
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800 max-h-56 overflow-y-auto" id="masterChannelList"></div>
-    </div>
-
-    <!-- Network Broadcast Engine -->
-    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3">
-      <div class="flex items-center gap-2">
-        <span class="text-base">📢</span>
-        <div>
-          <h3 class="text-xs font-semibold text-white">Broadcast Announcement</h3>
-          <p class="text-[10px] text-slate-400">Dispatches private notification to all connected channel admins</p>
+      <!-- Master Admin Directory -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Admins Directory</h3>
+          <span class="text-[11px] text-slate-500" id="adminCountLabel">0 Admins</span>
         </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800 max-h-56 overflow-y-auto" id="masterAdminList"></div>
       </div>
-      <textarea id="broadcastInput" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="Type administrative announcement or update..."></textarea>
-      <button id="sendBroadcastBtn" class="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
-        Dispatch Broadcast
-      </button>
-    </div>
 
+      <!-- Master Channel Network -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Channels Directory</h3>
+          <span class="text-[11px] text-slate-500" id="channelCountLabel">0 Channels</span>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800 max-h-56 overflow-y-auto" id="masterChannelList"></div>
+      </div>
+
+      <!-- Network Broadcast Engine -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3">
+        <div class="flex items-center gap-2">
+          <span class="text-base">📢</span>
+          <div>
+            <h3 class="text-xs font-semibold text-white">Broadcast Announcement</h3>
+            <p class="text-[10px] text-slate-400">Dispatches private notification to all connected channel admins</p>
+          </div>
+        </div>
+        <textarea id="broadcastInput" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="Type administrative announcement or update..."></textarea>
+        <button id="sendBroadcastBtn" class="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
+          Dispatch Broadcast
+        </button>
+      </div>
+
+    </div>
   </div>
 
   <script>
@@ -344,7 +367,22 @@
       tg.ready();
     }
 
-    const user = tg?.initDataUnsafe?.user || { id: 5527067319, first_name: "Surendra" };
+    // STRICT AUTHENTICATION: Never fallback to Owner ID
+    const rawInitData = tg?.initData || "";
+    const user = tg?.initDataUnsafe?.user || null;
+
+    // Root Containers
+    const unauthorizedScreen = document.getElementById("unauthorizedScreen");
+    const appContainer = document.getElementById("appContainer");
+
+    // Guard: Block execution if opened outside Telegram TMA
+    if (!user || !user.id || !rawInitData) {
+      unauthorizedScreen.classList.remove("hidden");
+      appContainer.remove(); // Completely destroy the DOM nodes for security
+      throw new Error("Execution halted: Not inside authorized Telegram WebApp.");
+    } else {
+      appContainer.classList.remove("hidden");
+    }
 
     // DOM Elements
     const roleBadge = document.getElementById("roleBadge");
@@ -411,22 +449,36 @@
     let currentChannel = null;
     let promoSlots = [];
 
+    // Helper for secure authenticated requests
+    function authHeaders() {
+      return {
+        "Content-Type": "application/json",
+        "X-Telegram-Init-Data": rawInitData
+      };
+    }
+
     async function init() {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/channels/${user.id}`);
+        const res = await fetch(`${BACKEND_URL}/api/channels/${user.id}`, {
+          headers: authHeaders()
+        });
         const data = await res.json();
 
         loading.classList.add("hidden");
         channelSection.classList.remove("hidden");
 
-        if (data.is_owner) {
+        // Strict Owner verification (Backend confirmed + User ID confirmed)
+        if (data.is_owner && Number(user.id) === 5527067319) {
           isOwner = true;
           roleBadge.innerText = "👑 Master Owner";
           roleBadge.className = "text-[11px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-full font-semibold";
           ownerNav.classList.remove("hidden");
           loadOwnerDashboard();
         } else {
+          isOwner = false;
           roleBadge.innerText = user.first_name || "Admin";
+          ownerNav.remove(); // Remove HQ button completely from regular admins
+          ownerSection.remove(); // Remove HQ section completely from DOM
         }
 
         if (data.success && data.channels.length > 0) {
@@ -578,7 +630,7 @@
       try {
         const res = await fetch(`${BACKEND_URL}/api/channel/update`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           body: JSON.stringify(payload)
         });
         const result = await res.json();
@@ -605,7 +657,7 @@
       try {
         const res = await fetch(`${BACKEND_URL}/api/channel/test-dm`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           body: JSON.stringify({ chat_id: currentChannel.chat_id, admin_id: user.id })
         });
         const result = await res.json();
@@ -626,7 +678,9 @@
     async function loadAnalytics(chatId) {
       analyticsList.innerHTML = `<p class="text-slate-500 text-[11px]">Loading conversion data...</p>`;
       try {
-        const res = await fetch(`${BACKEND_URL}/api/channel/analytics/${chatId}`);
+        const res = await fetch(`${BACKEND_URL}/api/channel/analytics/${chatId}`, {
+          headers: authHeaders()
+        });
         const data = await res.json();
         if (data.success && data.breakdown.length > 0) {
           analyticsList.innerHTML = data.breakdown.map(item => `
@@ -667,7 +721,7 @@
       try {
         const res = await fetch(`${BACKEND_URL}/api/channel/request-migration`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           body: JSON.stringify({ chat_id: currentChannel.chat_id, admin_id: user.id, target_link: target })
         });
         const result = await res.json();
@@ -700,10 +754,13 @@
       ownerSection.classList.remove("hidden");
     });
 
-    // Owner HQ Loader
+    // Owner HQ Loader (Guarded)
     async function loadOwnerDashboard() {
+      if (!isOwner) return;
       try {
-        const res = await fetch(`${BACKEND_URL}/api/owner/data/${user.id}`);
+        const res = await fetch(`${BACKEND_URL}/api/owner/data/${user.id}`, {
+          headers: authHeaders()
+        });
         const data = await res.json();
         if (!data.success) return;
 
@@ -717,7 +774,6 @@
         mActiveSlotsCount.innerText = `${activeCount} / ${promoSlots.length}`;
         channelCountLabel.innerText = `${data.channels.length} Channels`;
 
-        // Render Promo Slots
         promoSlotsContainer.innerHTML = promoSlots.map(slot => `
           <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2">
             <div class="flex items-center justify-between">
@@ -734,7 +790,6 @@
           </div>
         `).join("");
 
-        // Render Channels
         masterChannelList.innerHTML = data.channels.map(ch => `
           <div class="p-3 flex items-center justify-between gap-3 text-xs">
             <div class="truncate">
@@ -756,7 +811,9 @@
 
     async function loadOwnerAdmins() {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/owner/admins/${user.id}`);
+        const res = await fetch(`${BACKEND_URL}/api/owner/admins/${user.id}`, {
+          headers: authHeaders()
+        });
         const data = await res.json();
         if (!data.success) return;
 
@@ -784,7 +841,7 @@
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/direct-message`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           body: JSON.stringify({ admin_id: user.id, target_admin_id: targetId, message: msg })
         });
         const result = await res.json();
@@ -800,7 +857,9 @@
 
     async function loadPendingMigrations() {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/owner/migrations/${user.id}`);
+        const res = await fetch(`${BACKEND_URL}/api/owner/migrations/${user.id}`, {
+          headers: authHeaders()
+        });
         const data = await res.json();
         if (data.success && data.requests.length > 0) {
           pendingMigrationsCard.classList.remove("hidden");
@@ -835,7 +894,7 @@
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/migrations/action`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           body: JSON.stringify({ admin_id: user.id, request_id: reqId, action: action })
         });
         const result = await res.json();
@@ -864,7 +923,7 @@
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/promo-slots`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           body: JSON.stringify({ admin_id: user.id, slots: updatedSlots })
         });
         const result = await res.json();
@@ -887,7 +946,7 @@
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/toggle-channel`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           body: JSON.stringify({ admin_id: user.id, chat_id: chatId, is_active: newStatus })
         });
         const result = await res.json();
@@ -909,7 +968,7 @@
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/broadcast`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           body: JSON.stringify({ admin_id: user.id, message: msg })
         });
         const result = await res.json();
