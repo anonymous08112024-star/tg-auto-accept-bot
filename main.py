@@ -8,9 +8,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, HTTPException, Header, Response, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, Response, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from telegram import (
@@ -34,7 +33,6 @@ from telegram.ext import (
 from telegram.error import TelegramError, Forbidden, BadRequest
 from supabase import create_client, Client
 
-# Logging configuration
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
@@ -50,14 +48,11 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 DASHBOARD_URL = os.getenv("DASHBOARD_URL", "https://tg-accept-dash.pages.dev")
 
-if not BOT_TOKEN or not SUPABASE_URL or not SUPABASE_KEY:
-    logger.warning("Environment variables missing! Ensure BOT_TOKEN, SUPABASE_URL, and SUPABASE_KEY are set.")
-
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# FastAPI initialization
 app = FastAPI(title="God-Tier Auto-Accept Platform")
 
+# CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -66,14 +61,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# FloodGuard Async Queue (capped at ~25 req/sec)
+# Global Anti-Cache Middleware: Forces WebViews to always fetch real-time data
+@app.middleware("http")
+async def add_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 floodguard_queue: asyncio.Queue = asyncio.Queue()
 
 # ============================================================================
 # FLOODGUARD DISPATCH WORKER
 # ============================================================================
 async def floodguard_worker(tg_app: Application):
-    """Processes outbound messages sequentially with a 40ms pacing interval."""
+    """Processes outbound messages sequentially with a 40ms pacing interval (~25 req/sec)."""
     while True:
         job = await floodguard_queue.get()
         func, args, kwargs = job
@@ -95,7 +98,6 @@ async def floodguard_worker(tg_app: Application):
 # DYNAMIC SYSTEM DEFAULTS LOADER
 # ============================================================================
 async def get_system_channel_defaults() -> Dict[str, Any]:
-    """Retrieves dynamic default settings for new channels from Supabase."""
     fallback = {
         "custom_message": "Welcome to {channel}! Your access request has been approved.",
         "custom_btn_text": "📢 Official Channel",
@@ -116,29 +118,31 @@ async def get_system_channel_defaults() -> Dict[str, Any]:
     return fallback
 
 # ============================================================================
-# HELPER: HORIZON ANALYTICS CALCULATOR (ZERO ROW EGRESS)
+# HELPER: HORIZON ANALYTICS & AUDIENCE STATS
 # ============================================================================
 def compute_horizon_stats(chat_id: Optional[int] = None) -> Dict[str, int]:
-    """Computes joins across 24h, 30d, and 90d horizon windows with zero row payload."""
     now = datetime.now(timezone.utc)
     t_24h = (now - timedelta(hours=24)).isoformat()
     t_30d = (now - timedelta(days=30)).isoformat()
     t_90d = (now - timedelta(days=90)).isoformat()
 
-    stats = {"joins_24h": 0, "joins_30d": 0, "joins_90d": 0}
+    stats = {"joins_24h": 0, "joins_30d": 0, "joins_90d": 0, "subscriber_count": 0}
     try:
         q_24h = supabase.table("join_logs").select("*", count="exact", head=True).gte("created_at", t_24h)
         q_30d = supabase.table("join_logs").select("*", count="exact", head=True).gte("created_at", t_30d)
         q_90d = supabase.table("join_logs").select("*", count="exact", head=True).gte("created_at", t_90d)
+        q_all = supabase.table("join_logs").select("*", count="exact", head=True)
 
         if chat_id is not None:
             q_24h = q_24h.eq("chat_id", chat_id)
             q_30d = q_30d.eq("chat_id", chat_id)
             q_90d = q_90d.eq("chat_id", chat_id)
+            q_all = q_all.eq("chat_id", chat_id)
 
         stats["joins_24h"] = q_24h.execute().count or 0
         stats["joins_30d"] = q_30d.execute().count or 0
         stats["joins_90d"] = q_90d.execute().count or 0
+        stats["subscriber_count"] = q_all.execute().count or 0
     except Exception as e:
         logger.error(f"Error calculating horizon stats: {e}")
 
@@ -148,7 +152,6 @@ def compute_horizon_stats(chat_id: Optional[int] = None) -> Dict[str, int]:
 # TELEGRAM BOT HANDLERS
 # ============================================================================
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Deep-link & onboarding handler."""
     args = context.args or []
     user = update.effective_user
 
@@ -188,7 +191,6 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Real-time analytics directly in chat."""
     user = update.effective_user
     res = supabase.table("channels").select("*").eq("admin_id", user.id).execute()
     channels = res.data or []
@@ -210,6 +212,7 @@ async def cmd_mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"• Last 24 Hours: <b>+{h['joins_24h']}</b>\n"
             f"• Last 30 Days: <b>{h['joins_30d']}</b>\n"
             f"• Last 90 Days: <b>{h['joins_90d']}</b>\n"
+            f"• Logged Subscribers: <b>{h['subscriber_count']}</b>\n"
             f"• Status: {status}\n\n"
         )
 
@@ -220,7 +223,6 @@ async def cmd_mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_banner_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Saves banner photo file_id to Supabase."""
     target_channel_id = context.user_data.get("awaiting_banner_for")
     if not target_channel_id or not update.message.photo:
         return
@@ -249,7 +251,7 @@ async def handle_banner_photo(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles channel additions, promotions, and removals with live Admin DM alerts."""
+    """Auto-registers channels and re-binds ownership dynamically upon bot promotion."""
     result = update.my_chat_member
     if not result:
         return
@@ -259,7 +261,6 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
     old_status = result.old_chat_member.status
     admin_user = result.from_user
 
-    # Case 1: Bot Promoted to Administrator
     if new_status == "administrator":
         existing = supabase.table("channels").select("chat_id").eq("chat_id", chat.id).execute()
         magic_link = ""
@@ -293,9 +294,16 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
                 "is_active": True
             }).execute()
         else:
-            supabase.table("channels").update({"is_active": True}).eq("chat_id", chat.id).execute()
+            update_data = {
+                "is_active": True,
+                "chat_title": chat.title or "Untitled Channel",
+                "admin_id": admin_user.id,
+                "admin_username": admin_user.username or ""
+            }
+            if magic_link:
+                update_data["custom_btn_url"] = magic_link
+            supabase.table("channels").update(update_data).eq("chat_id", chat.id).execute()
 
-        # Send instant confirmation DM to the Admin
         try:
             await context.bot.send_message(
                 chat_id=admin_user.id,
@@ -303,7 +311,7 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
                     f"✅ <b>Successfully Connected to {chat.title}!</b>\n\n"
                     f"• Channel ID: <code>{chat.id}</code>\n"
                     f"• Auto-Accept Engine: <b>Active</b>\n"
-                    f"• Magic Link: {magic_link if magic_link else '<i>Use existing join-request link</i>'}\n\n"
+                    f"• Magic Link: {magic_link if magic_link else '<i>Use existing join link</i>'}\n\n"
                     f"Tap below to configure your welcome messages and smart buttons:"
                 ),
                 parse_mode="HTML",
@@ -314,7 +322,6 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
         except Exception as e:
             logger.info(f"Could not dispatch DM to admin {admin_user.id}: {e}")
 
-    # Case 2: Bot Demoted, Removed, or Left
     elif new_status in ["left", "kicked", "member"] and old_status == "administrator":
         supabase.table("channels").update({"is_active": False}).eq("chat_id", chat.id).execute()
         try:
@@ -332,7 +339,6 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
 
 
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Processes incoming join requests with pre-approval DM dispatch."""
     req = update.chat_join_request
     if not req:
         return
@@ -402,6 +408,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     silent = bool(channel.get("silent_dm", False))
     banner_file_id = channel.get("banner_file_id")
 
+    # PRE-APPROVAL DISPATCH: Deliver welcome DM before finalizing approval
     async def dispatch_and_approve():
         try:
             if banner_file_id:
@@ -450,7 +457,6 @@ tg_application: Optional[Application] = None
 
 @app.on_event("startup")
 async def startup_event():
-    """Initializes Telegram Bot engine and starts FloodGuard worker."""
     global tg_application
     if not BOT_TOKEN:
         logger.error("BOT_TOKEN is missing. Telegram engine will not start.")
@@ -458,7 +464,6 @@ async def startup_event():
 
     tg_application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Core Command & Update Handlers
     tg_application.add_handler(CommandHandler("start", cmd_start))
     tg_application.add_handler(CommandHandler("settings", cmd_start))
     tg_application.add_handler(CommandHandler("mystats", cmd_mystats))
@@ -468,11 +473,8 @@ async def startup_event():
 
     await tg_application.initialize()
     await tg_application.start()
-    
-    # Receive all update types (including chat_member & chat_join_request)
     await tg_application.updater.start_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
 
-    # Set bottom-left native chat Menu Button directly to Mini App
     try:
         await tg_application.bot.set_chat_menu_button(
             menu_button=MenuButtonWebApp(text="⚡ Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))
@@ -586,6 +588,7 @@ async def get_admin_channels(admin_id: int):
             ch["joins_24h"] = h_stats["joins_24h"]
             ch["joins_30d"] = h_stats["joins_30d"]
             ch["joins_90d"] = h_stats["joins_90d"]
+            ch["subscriber_count"] = h_stats["subscriber_count"]
 
         return {
             "success": True,
@@ -752,6 +755,7 @@ async def get_owner_dashboard_data(admin_id: int):
             c["joins_24h"] = c_stats["joins_24h"]
             c["joins_30d"] = c_stats["joins_30d"]
             c["joins_90d"] = c_stats["joins_90d"]
+            c["subscriber_count"] = c_stats["subscriber_count"]
 
         return {
             "success": True,
@@ -817,6 +821,7 @@ async def get_admin_inspection_detail(admin_id: int, target_admin_id: int):
             c["joins_24h"] = c_stats["joins_24h"]
             c["joins_30d"] = c_stats["joins_30d"]
             c["joins_90d"] = c_stats["joins_90d"]
+            c["subscriber_count"] = c_stats["subscriber_count"]
 
         return {
             "success": True,
@@ -869,7 +874,15 @@ async def save_channel_defaults_api(payload: ChannelDefaultsPayload):
 
 @app.get("/api/owner/export-subscribers-csv/{admin_id}")
 async def export_subscribers_csv(admin_id: int):
+    """
+    Direct Telegram Document Dispatch:
+    Generates the CSV in-memory and delivers it directly to your Telegram chat.
+    Bypasses Android/iOS Mini App WebView download blocks.
+    """
     verify_owner(admin_id)
+    if not tg_application:
+        raise HTTPException(status_code=503, detail="Telegram engine offline")
+
     try:
         res = supabase.table("view_unique_subscribers").select("*").execute()
         rows = res.data or []
@@ -888,15 +901,29 @@ async def export_subscribers_csv(admin_id: int):
                 r.get("first_joined_at", "")
             ])
 
-        output.seek(0)
+        csv_bytes = output.getvalue().encode("utf-8")
+        doc = io.BytesIO(csv_bytes)
         filename = f"audience_vault_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
-        
-        return StreamingResponse(
-            iter([output.getvalue()]),
-            media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        doc.name = filename
+
+        await tg_application.bot.send_document(
+            chat_id=admin_id,
+            document=doc,
+            caption=(
+                f"📁 <b>Audience Vault CSV Export</b>\n\n"
+                f"• Unique Subscribers: <b>{len(rows)}</b>\n"
+                f"• Generated: <code>{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}</code>"
+            ),
+            parse_mode="HTML"
         )
+
+        return {
+            "success": True,
+            "count": len(rows),
+            "message": "CSV delivered directly to your Telegram chat!"
+        }
     except Exception as e:
+        logger.error(f"Error generating CSV document: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -914,7 +941,11 @@ async def broadcast_subscribers(payload: SubscriberBroadcastPayload, background_
 
         user_ids = list(set(r["user_id"] for r in (res.data or [])))
         if not user_ids:
-            return {"success": True, "queued": 0, "message": "No subscribers found in target segment."}
+            return {
+                "success": False,
+                "queued": 0,
+                "error": "This channel segment has 0 recorded subscribers in the vault. No messages were queued."
+            }
 
         markup = None
         if payload.button_text and payload.button_url:
