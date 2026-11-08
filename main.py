@@ -60,7 +60,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global Anti-Cache Middleware: Forces WebViews to always fetch fresh data
+# Global Anti-Cache Middleware
 @app.middleware("http")
 async def add_cache_headers(request: Request, call_next):
     response = await call_next(request)
@@ -250,10 +250,6 @@ async def handle_banner_photo(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Handles addition and status updates across Channels, Supergroups, and Groups.
-    Automatically resolves Anonymous Admin masking and regular member status.
-    """
     result = update.my_chat_member
     if not result:
         return
@@ -264,7 +260,6 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
     old_status = result.old_chat_member.status
     raw_admin_user = result.from_user
 
-    # 1. Resolve Anonymous Admins and System IDs
     effective_admin_id = raw_admin_user.id if raw_admin_user else OWNER_ID
     effective_username = raw_admin_user.username or "" if raw_admin_user else ""
 
@@ -272,7 +267,6 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
         effective_admin_id = OWNER_ID
         effective_username = "Surendra"
 
-    # Case A: Bot added to a group as a basic member (needs promotion to Administrator)
     if new_status == "member" and old_status in ["left", "kicked"]:
         if chat.type in ["group", "supergroup"]:
             try:
@@ -289,7 +283,6 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
                 logger.info(f"Could not send member prompt in group {chat.id}: {e}")
         return
 
-    # Case B: Bot promoted to Administrator in Channel, Supergroup, or Group
     if new_status == "administrator":
         magic_link = ""
         try:
@@ -302,7 +295,6 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
         except Exception as e:
             logger.warning(f"Could not auto-generate magic link for {chat.id}: {e}")
 
-        # Check existing database entry
         try:
             existing = supabase.table("channels").select("chat_id").eq("chat_id", chat.id).execute()
             if not existing.data:
@@ -345,7 +337,6 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
             f"Tap below to configure welcome copy and smart buttons:"
         )
 
-        # 1. Send confirmation to Admin's private Telegram chat
         try:
             await context.bot.send_message(
                 chat_id=effective_admin_id,
@@ -358,7 +349,6 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
         except Exception as e:
             logger.info(f"Could not send DM to admin {effective_admin_id}: {e}")
 
-        # 2. For groups and supergroups, also post directly in the chat for visibility
         if chat.type in ["group", "supergroup"]:
             try:
                 await context.bot.send_message(
@@ -373,7 +363,6 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
             except Exception as e:
                 logger.info(f"Could not send confirmation to group {chat.id}: {e}")
 
-    # Case C: Bot Demoted, Kicked, or Removed
     elif new_status in ["left", "kicked"] and old_status == "administrator":
         try:
             supabase.table("channels").update({"is_active": False}).eq("chat_id", chat.id).execute()
@@ -502,7 +491,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     await floodguard_queue.put((dispatch_and_approve, (), {}))
 
 # ============================================================================
-# FASTAPI LIFESPAN & APPLICATION RUNNER
+# FASTAPI LIFESPAN & ENGINE RUNNER
 # ============================================================================
 tg_application: Optional[Application] = None
 
@@ -576,10 +565,18 @@ class MigrationRequestPayload(BaseModel):
     admin_id: int
     target_link: str
 
+class MigrationTestDmPayload(BaseModel):
+    admin_id: int
+    request_id: int
+    custom_message: Optional[str] = None
+    button_text: Optional[str] = None
+
 class MigrationActionPayload(BaseModel):
     admin_id: int
     request_id: int
-    action: str
+    action: str  # "approve" | "reject"
+    custom_message: Optional[str] = None
+    button_text: Optional[str] = None
 
 class PromoSlotItem(BaseModel):
     slot_id: int
@@ -763,7 +760,7 @@ async def request_channel_migration(payload: MigrationRequestPayload):
         users = set(r["user_id"] for r in (res.data or []))
 
         ch = supabase.table("channels").select("chat_title").eq("chat_id", payload.chat_id).execute()
-        title = ch.data[0]["chat_title"] if ch.data else "Channel"
+        title = ch.data[0]["chat_title"] if (ch.data and len(ch.data) > 0) else "Channel"
 
         supabase.table("migration_requests").insert({
             "channel_id": payload.chat_id,
@@ -777,7 +774,8 @@ async def request_channel_migration(payload: MigrationRequestPayload):
 
         return {"success": True, "audience_count": len(users)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Migration request error: {e}")
+        return {"success": False, "error": str(e)}
 
 # ============================================================================
 # API ROUTES: OWNER HQ (RESTRICTED TO OWNER_ID)
@@ -925,7 +923,6 @@ async def save_channel_defaults_api(payload: ChannelDefaultsPayload):
 
 @app.get("/api/owner/export-subscribers-csv/{admin_id}")
 async def export_subscribers_csv(admin_id: int):
-    """Generates CSV in-memory and dispatches directly to admin Telegram chat."""
     verify_owner(admin_id)
     if not tg_application:
         raise HTTPException(status_code=503, detail="Telegram engine offline")
@@ -1074,8 +1071,62 @@ async def get_owner_migrations(admin_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/owner/migrations/test-dm")
+async def send_migration_test_dm(payload: MigrationTestDmPayload):
+    """
+    Sends the exact preview of the migration alert with inline button
+    and official watermark directly to the Owner's private chat.
+    """
+    verify_owner(payload.admin_id)
+    if not tg_application:
+        raise HTTPException(status_code=503, detail="Telegram engine offline")
+
+    try:
+        req_res = supabase.table("migration_requests").select("*").eq("id", payload.request_id).execute()
+        if not req_res.data:
+            raise HTTPException(status_code=404, detail="Migration request not found")
+
+        req = req_res.data[0]
+        channel_title = req.get("channel_title") or "Community"
+        target_link = req.get("target_link") or "https://t.me"
+
+        base_msg = payload.custom_message.strip() if (payload.custom_message and payload.custom_message.strip()) else (
+            f"🚨 <b>Channel Relocation Alert</b>\n\n"
+            f"The community <b>{channel_title}</b> has migrated to a new backup channel.\n\n"
+            f"Tap the button below to restore access immediately:"
+        )
+
+        watermark = (
+            f"\n\n━━━━━━━━━━━━━━━━━━━\n"
+            f"⚡ <i>Audience Vault Recovery • @{tg_application.bot.username}</i>"
+        )
+
+        full_message = f"🧪 <b>TEST PREVIEW: Migration DM</b>\n\n{base_msg}{watermark}"
+        btn_label = payload.button_text.strip() if (payload.button_text and payload.button_text.strip()) else "📢 Join New Backup Channel"
+        markup = InlineKeyboardMarkup([[InlineKeyboardButton(btn_label, url=target_link)]])
+
+        await tg_application.bot.send_message(
+            chat_id=payload.admin_id,
+            text=full_message,
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+
+        return {"success": True, "message": "Test DM delivered to your private chat!"}
+    except Exception as e:
+        logger.error(f"Error in send_migration_test_dm: {e}")
+        return {"success": False, "error": str(e)}
+
+
 @app.post("/api/owner/migrations/action")
 async def handle_migration_action(payload: MigrationActionPayload, background_tasks: BackgroundTasks):
+    """
+    Approves or rejects migration requests.
+    On approval:
+    - Customizes message & button with official watermark
+    - Pushes inline button to subscribers via FloodGuard
+    - Dispatches a comprehensive Migration Completion Report to Owner & Admin
+    """
     verify_owner(payload.admin_id)
     if not tg_application:
         raise HTTPException(status_code=503, detail="Telegram engine offline")
@@ -1088,20 +1139,47 @@ async def handle_migration_action(payload: MigrationActionPayload, background_ta
         req = req_res.data[0]
         if payload.action == "reject":
             supabase.table("migration_requests").update({"status": "rejected"}).eq("id", payload.request_id).execute()
-            return {"success": True, "message": "Rejected"}
+            # Notify channel admin about rejection
+            try:
+                await tg_application.bot.send_message(
+                    chat_id=req["admin_id"],
+                    text=(
+                        f"❌ <b>Audience Migration Request Rejected</b>\n\n"
+                        f"• Channel: <b>{req['channel_title']}</b>\n"
+                        f"• Target Link: <code>{req['target_link']}</code>\n\n"
+                        f"Your migration request was reviewed and rejected by bot administrators."
+                    ),
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
+            return {"success": True, "message": "Migration request rejected."}
 
+        # Query all historical joiners in the last 90 days for this channel
         t_90d = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
         u_res = supabase.table("join_logs").select("user_id").eq("chat_id", req["channel_id"]).gte("created_at", t_90d).execute()
         uids = list(set(r["user_id"] for r in (u_res.data or [])))
 
-        text = (
-            f"🚨 <b>Channel Relocation Alert</b>\n\n"
-            f"The community <b>{req['channel_title']}</b> has migrated to a new backup channel.\n\n"
-            f"Tap the button below to restore access:"
-        )
-        markup = InlineKeyboardMarkup([[InlineKeyboardButton("📢 Join New Backup Channel", url=req["target_link"])]])
+        channel_title = req.get("channel_title") or "Community"
+        target_link = req.get("target_link") or "https://t.me"
 
-        async def enqueue_migration_batch(user_list: List[int], msg_text: str, reply_markup):
+        base_msg = payload.custom_message.strip() if (payload.custom_message and payload.custom_message.strip()) else (
+            f"🚨 <b>Channel Relocation Alert</b>\n\n"
+            f"The community <b>{channel_title}</b> has migrated to a new backup channel.\n\n"
+            f"Tap the button below to restore access immediately:"
+        )
+
+        watermark = (
+            f"\n\n━━━━━━━━━━━━━━━━━━━\n"
+            f"⚡ <i>Audience Vault Recovery • @{tg_application.bot.username}</i>"
+        )
+        full_message = f"{base_msg}{watermark}"
+
+        btn_label = payload.button_text.strip() if (payload.button_text and payload.button_text.strip()) else "📢 Join New Backup Channel"
+        markup = InlineKeyboardMarkup([[InlineKeyboardButton(btn_label, url=target_link)]])
+
+        async def execute_migration_pipeline(user_list: List[int], msg_text: str, reply_markup, req_data: Dict[str, Any]):
+            # 1. Enqueue all subscriber DMs via FloodGuard
             for uid in user_list:
                 async def send_dm(target_uid=uid):
                     await tg_application.bot.send_message(
@@ -1112,12 +1190,39 @@ async def handle_migration_action(payload: MigrationActionPayload, background_ta
                     )
                 await floodguard_queue.put((send_dm, (), {}))
 
-        background_tasks.add_task(enqueue_migration_batch, uids, text, markup)
+            # 2. Dispatch Completion Report to Owner & Admin
+            report_text = (
+                f"📊 <b>AUDIENCE MIGRATION REPORT</b>\n\n"
+                f"• Community: <b>{req_data['channel_title']}</b>\n"
+                f"• Channel ID: <code>{req_data['channel_id']}</code>\n"
+                f"• Target Link: <code>{req_data['target_link']}</code>\n"
+                f"• Subscribers Enqueued: <b>{len(user_list)}</b>\n"
+                f"• Dispatch Mode: <b>FloodGuard (~25/sec)</b>\n"
+                f"• Watermark: <b>Active</b>\n"
+                f"• Timestamp: <code>{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}</code>\n\n"
+                f"✅ <i>All relocation messages have been scheduled for private DM delivery.</i>"
+            )
+
+            # Send to Master Owner
+            try:
+                await tg_application.bot.send_message(chat_id=OWNER_ID, text=report_text, parse_mode="HTML")
+            except Exception as e:
+                logger.error(f"Failed to deliver migration report to owner: {e}")
+
+            # Send to Channel Admin (if different from Owner)
+            if int(req_data["admin_id"]) != OWNER_ID:
+                try:
+                    await tg_application.bot.send_message(chat_id=req_data["admin_id"], text=report_text, parse_mode="HTML")
+                except Exception as e:
+                    logger.error(f"Failed to deliver migration report to admin: {e}")
+
+        background_tasks.add_task(execute_migration_pipeline, uids, full_message, markup, req)
         supabase.table("migration_requests").update({"status": "approved"}).eq("id", payload.request_id).execute()
 
         return {"success": True, "dispatched": len(uids)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error handling migration action: {e}")
+        return {"success": False, "error": str(e)}
 
 
 @app.post("/api/owner/broadcast")
