@@ -78,9 +78,9 @@
       <!-- No Channels Connected State -->
       <div id="noChannels" class="hidden bg-slate-900/60 border border-slate-800 rounded-2xl p-6 text-center">
         <div class="text-3xl mb-2">📢</div>
-        <h3 class="text-sm font-semibold text-white mb-1">No Channels Connected</h3>
+        <h3 class="text-sm font-semibold text-white mb-1">No Communities Connected</h3>
         <p class="text-xs text-slate-400 leading-relaxed">
-          Add <b>@AutoRequestAcceptorxBot</b> as an <b>Administrator</b> with <i>Invite Users</i> permission in your channel to begin.
+          Add <b>@AutoRequestAcceptorxBot</b> as an <b>Administrator</b> with <i>Invite Users</i> permission in your channel or group to begin.
         </p>
       </div>
 
@@ -89,7 +89,7 @@
         <!-- Target Channel Selector with Instant Refresh Button -->
         <div class="space-y-2">
           <div class="flex items-center justify-between">
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Target Channel</label>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Target Community</label>
             <button type="button" id="refreshChannelsBtn" onclick="refreshChannelsList()" class="text-[11px] text-blue-400 font-semibold hover:underline flex items-center gap-1">
               🔄 Refresh List
             </button>
@@ -212,7 +212,7 @@
 
           <div id="eventMessageContainer" class="hidden pt-2 border-t border-slate-800 space-y-1.5">
             <label class="block text-[11px] font-medium text-amber-400">Event Message Copy</label>
-            <textarea id="eventMessage" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="🚨 MATCH DAY SPECIAL: Live predictions available now!"></textarea>
+            <textarea id="eventMessage" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="🚨 MATCH DAY SPECIAL: Live updates available now!"></textarea>
           </div>
         </div>
 
@@ -244,7 +244,7 @@
         <!-- Save & Test Actions -->
         <div class="space-y-2 pt-1">
           <button id="saveBtn" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all shadow-lg shadow-blue-600/20 active:scale-[0.99]">
-            Save Channel Configuration
+            Save Community Configuration
           </button>
           <button id="testDmBtn" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
             📲 Send Test DM to My Telegram
@@ -273,7 +273,7 @@
             <span class="text-base">🚨</span>
             <div>
               <h4 class="text-xs font-semibold text-white">Audience Vault & Disaster Recovery</h4>
-              <p class="text-[10px] text-slate-400">Channel banned? Request emergency migration DM to past subscribers</p>
+              <p class="text-[10px] text-slate-400">Community banned? Request emergency migration DM to past subscribers</p>
             </div>
           </div>
           <div class="space-y-2 pt-1">
@@ -324,16 +324,16 @@
         </button>
       </div>
 
-      <!-- Audience Vault Review Queue -->
+      <!-- Audience Vault Review Queue (Editable with Inline Test DM) -->
       <div id="pendingMigrationsCard" class="hidden bg-rose-950/20 border border-rose-800/50 rounded-2xl p-4 space-y-3">
         <div class="flex items-center gap-2">
           <span class="text-base">🚨</span>
           <div>
             <h3 class="text-xs font-semibold text-rose-300">Pending Migration Requests</h3>
-            <p class="text-[10px] text-slate-400">Channel admins requesting emergency broadcast to subscribers</p>
+            <p class="text-[10px] text-slate-400">Review copy, test private DM, and authorize relocation</p>
           </div>
         </div>
-        <div id="migrationQueueList" class="space-y-2 text-xs"></div>
+        <div id="migrationQueueList" class="space-y-3 text-xs"></div>
       </div>
 
       <!-- Dynamic 3-Slot Co-Promotion Rotator -->
@@ -364,8 +364,8 @@
       <!-- Master Channel Network -->
       <div class="space-y-2">
         <div class="flex items-center justify-between">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Channels Directory</h3>
-          <span class="text-[11px] text-slate-500" id="channelCountLabel">0 Channels</span>
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Communities Directory</h3>
+          <span class="text-[11px] text-slate-500" id="channelCountLabel">0 Communities</span>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800 max-h-64 overflow-y-auto" id="masterChannelList"></div>
       </div>
@@ -396,7 +396,7 @@
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div>
           <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
-            <span>🔍</span> Admin Channels & Moderation Audit
+            <span>🔍</span> Admin Communities & Moderation Audit
           </h3>
           <p class="text-[11px] text-slate-400" id="inspectAdminTitle">Admin ID: ...</p>
         </div>
@@ -414,8 +414,8 @@
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div>
-          <h3 class="text-sm font-bold text-white">⚙️ Global New Channel Defaults</h3>
-          <p class="text-[11px] text-slate-400">Settings applied automatically to all newly added channels</p>
+          <h3 class="text-sm font-bold text-white">⚙️ Global New Community Defaults</h3>
+          <p class="text-[11px] text-slate-400">Settings applied automatically to all newly added communities</p>
         </div>
         <button onclick="closeDefaultsModal()" class="text-slate-400 hover:text-white text-lg font-bold px-2">✕</button>
       </div>
@@ -472,12 +472,12 @@
           <label class="block text-[11px] font-medium text-slate-400 mb-1">Target Audience Segment</label>
           <select id="broadTargetType" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500">
             <option value="all">🌍 All Network Subscribers (Global Vault)</option>
-            <option value="channel">🎯 Specific Channel Audience Only</option>
+            <option value="channel">🎯 Specific Community Audience Only</option>
           </select>
         </div>
 
         <div id="broadChannelSelectContainer" class="hidden">
-          <label class="block text-[11px] font-medium text-slate-400 mb-1">Select Channel Audience</label>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Select Community Audience</label>
           <select id="broadChannelSelect" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500">
           </select>
         </div>
@@ -795,7 +795,7 @@
     window.insertTag = function(tag) {
       const pos = customMessage.selectionStart;
       const val = customMessage.value;
-      customMessage.value = val.substring(0, pos) + tag + val.substring(pos);
+      customMessage.value = val.substring(pos, pos) + tag + val.substring(pos);
       customMessage.focus();
       customMessage.setSelectionRange(pos + tag.length, pos + tag.length);
       updatePreview();
@@ -852,7 +852,7 @@
         if (result.success) {
           Object.assign(currentChannel, payload);
           tg?.HapticFeedback?.notificationOccurred("success");
-          alert("Channel configuration updated successfully!");
+          alert("Community configuration updated successfully!");
         } else {
           alert("Error: " + (result.error || "Could not save."));
         }
@@ -860,7 +860,7 @@
         alert("Network communication error.");
       } finally {
         saveBtn.disabled = false;
-        saveBtn.innerText = "Save Channel Configuration";
+        saveBtn.innerText = "Save Community Configuration";
       }
     });
 
@@ -929,7 +929,7 @@
         alert("Please enter a valid Telegram invite link.");
         return;
       }
-      if (!confirm("Submit emergency channel migration request to Bot Management?")) return;
+      if (!confirm("Submit emergency community migration request to Bot Management?")) return;
 
       requestMigrationBtn.disabled = true;
       requestMigrationBtn.innerText = "Submitting...";
@@ -945,7 +945,7 @@
           alert(`Migration requested for ${result.audience_count} audience members. Awaiting Owner approval.`);
           migrationTargetInput.value = "";
         } else {
-          alert("Request failed: " + (result.error || ""));
+          alert("Request failed: " + (result.error || result.detail || "Database error."));
         }
       } catch (e) {
         alert("Communication error.");
@@ -984,9 +984,8 @@
         m90dJoins.innerText = (data.metrics.joins_90d || 0).toLocaleString();
 
         allOwnerChannels = data.channels || [];
-        channelCountLabel.innerText = `${allOwnerChannels.length} Channels`;
+        channelCountLabel.innerText = `${allOwnerChannels.length} Communities`;
 
-        // Populate broadChannelSelect with real-time reachable subscriber counts
         broadChannelSelect.innerHTML = allOwnerChannels.map(c => `
           <option value="${c.chat_id}">${c.chat_title} (${c.subscriber_count || 0} reachable subscribers)</option>
         `).join("");
@@ -1069,7 +1068,7 @@
 
     window.inspectAdmin = async function(targetAdminId) {
       inspectAdminTitle.innerText = `Admin ID: ${targetAdminId}`;
-      inspectChannelsList.innerHTML = `<p class="text-slate-500 text-xs">Loading admin channel records...</p>`;
+      inspectChannelsList.innerHTML = `<p class="text-slate-500 text-xs">Loading admin records...</p>`;
       adminInspectModal.classList.remove("hidden");
 
       try {
@@ -1079,7 +1078,7 @@
         });
         const data = await res.json();
         if (!data.success || data.channels.length === 0) {
-          inspectChannelsList.innerHTML = `<p class="text-slate-500 text-xs">No channels connected for this admin.</p>`;
+          inspectChannelsList.innerHTML = `<p class="text-slate-500 text-xs">No communities connected for this admin.</p>`;
           return;
         }
 
@@ -1091,7 +1090,7 @@
                 <p class="text-[10px] text-slate-400">ID: ${ch.chat_id} • 24h: <span class="text-blue-400">+${ch.joins_24h || 0}</span> • Subs: ${ch.subscriber_count || 0}</p>
               </div>
               <a href="${ch.custom_btn_url || 'https://t.me'}" target="_blank" class="text-[10px] px-2.5 py-1 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold">
-                🔗 Check Channel
+                🔗 Check Link
               </a>
             </div>
 
@@ -1114,7 +1113,7 @@
             <div class="flex items-center justify-between pt-1">
               <label class="text-[11px] text-slate-300 flex items-center gap-1.5 cursor-pointer">
                 <input type="checkbox" id="ovActive_${ch.chat_id}" class="accent-emerald-500" ${ch.is_active ? 'checked' : ''}>
-                <span>Channel Active</span>
+                <span>Active</span>
               </label>
               <button onclick="saveChannelOverride(${ch.chat_id})" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg text-[11px] shadow-sm">
                 Save & Override
@@ -1123,7 +1122,7 @@
           </div>
         `).join("");
       } catch (err) {
-        inspectChannelsList.innerHTML = `<p class="text-rose-400 text-xs">Failed to load channels.</p>`;
+        inspectChannelsList.innerHTML = `<p class="text-rose-400 text-xs">Failed to load communities.</p>`;
       }
     };
 
@@ -1147,12 +1146,12 @@
         });
         const result = await res.json();
         if (result.success) {
-          alert("Channel configuration sanitized and overridden successfully!");
+          alert("Community configuration sanitized and overridden successfully!");
         } else {
           alert("Error: " + (result.error || ""));
         }
       } catch (e) {
-        alert("Failed to override channel.");
+        alert("Failed to override community.");
       }
     };
 
@@ -1226,7 +1225,7 @@
         });
         const result = await res.json();
         if (result.success) {
-          alert("Global new channel defaults updated! All future channels will inherit these settings.");
+          alert("Global new community defaults updated! All future additions will inherit these settings.");
           closeDefaultsModal();
         } else {
           alert("Error saving defaults.");
@@ -1313,6 +1312,7 @@
       }
     };
 
+    // EDITABLE MIGRATIONS QUEUE WITH PREVIEW & TEST DM
     async function loadPendingMigrations() {
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/migrations/${user.id}?t=${Date.now()}`, {
@@ -1323,17 +1323,33 @@
         if (data.success && data.requests.length > 0) {
           pendingMigrationsCard.classList.remove("hidden");
           migrationQueueList.innerHTML = data.requests.map(req => `
-            <div class="bg-slate-900 border border-rose-900/60 p-3 rounded-xl space-y-2">
-              <div class="flex items-center justify-between">
-                <p class="font-semibold text-white">${req.channel_title}</p>
-                <span class="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded font-mono">${req.user_count} Users</span>
+            <div class="bg-slate-900 border border-rose-900/60 p-3.5 rounded-2xl space-y-3">
+              <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div>
+                  <p class="font-bold text-white text-xs">${req.channel_title}</p>
+                  <p class="text-[10px] text-slate-400">Admin ID: ${req.admin_id} • Target Link: <a href="${req.target_link}" target="_blank" class="text-blue-400 underline break-all">${req.target_link}</a></p>
+                </div>
+                <span class="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full font-mono font-semibold">${req.user_count} Users</span>
               </div>
-              <p class="text-[11px] text-slate-300 break-all">Target Link: <a href="${req.target_link}" target="_blank" class="text-blue-400 underline">${req.target_link}</a></p>
-              <div class="flex items-center gap-2 pt-1">
-                <button onclick="handleMigration(${req.id}, 'approve')" class="flex-1 py-1 px-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-semibold">
+
+              <div class="space-y-1.5">
+                <label class="block text-[10px] font-medium text-slate-400">Relocation Message Copy (Leave blank to use default)</label>
+                <textarea id="migMsg_${req.id}" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500" placeholder="🚨 Channel Relocation Alert: The community has migrated to a new backup channel..."></textarea>
+              </div>
+
+              <div>
+                <label class="block text-[10px] font-medium text-slate-400 mb-1">Inline Button Label</label>
+                <input type="text" id="migBtn_${req.id}" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500" value="📢 Join New Backup Channel">
+              </div>
+
+              <div class="flex items-center gap-2 pt-1 border-t border-slate-800/80">
+                <button type="button" onclick="testMigrationDm(${req.id})" class="py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-xl text-[11px] font-semibold border border-slate-700 transition-all active:scale-95">
+                  🧪 Test DM
+                </button>
+                <button type="button" onclick="handleMigration(${req.id}, 'approve')" class="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[11px] font-semibold transition-all active:scale-95 shadow-sm">
                   Approve & Dispatch
                 </button>
-                <button onclick="handleMigration(${req.id}, 'reject')" class="py-1 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px]">
+                <button type="button" onclick="handleMigration(${req.id}, 'reject')" class="py-1.5 px-3 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 rounded-xl text-[11px] font-medium transition-all">
                   Reject
                 </button>
               </div>
@@ -1347,18 +1363,58 @@
       }
     }
 
+    window.testMigrationDm = async function(reqId) {
+      const customMsg = document.getElementById(`migMsg_${reqId}`)?.value || "";
+      const btnText = document.getElementById(`migBtn_${reqId}`)?.value || "";
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/migrations/test-dm`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            admin_id: user.id,
+            request_id: reqId,
+            custom_message: customMsg,
+            button_text: btnText
+          })
+        });
+        const result = await res.json();
+        if (result.success) {
+          tg?.HapticFeedback?.notificationOccurred("success");
+          alert("🧪 Test migration DM delivered to your private Telegram chat!");
+        } else {
+          alert("Test DM failed: " + (result.error || ""));
+        }
+      } catch (e) {
+        alert("Failed to communicate with bot.");
+      }
+    };
+
     window.handleMigration = async function(reqId, action) {
       if (!confirm(`Are you sure you want to ${action} this migration request?`)) return;
+
+      const customMsg = document.getElementById(`migMsg_${reqId}`)?.value || "";
+      const btnText = document.getElementById(`migBtn_${reqId}`)?.value || "";
 
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/migrations/action`, {
           method: "POST",
           headers: authHeaders(),
-          body: JSON.stringify({ admin_id: user.id, request_id: reqId, action: action })
+          body: JSON.stringify({
+            admin_id: user.id,
+            request_id: reqId,
+            action: action,
+            custom_message: customMsg,
+            button_text: btnText
+          })
         });
         const result = await res.json();
         if (result.success) {
-          alert(`Migration ${action}d successfully!`);
+          if (action === "approve") {
+            alert(`Migration authorized! Scheduled for ${result.dispatched} subscribers. A completion report has been sent to your Telegram chat.`);
+          } else {
+            alert("Migration request rejected.");
+          }
           loadPendingMigrations();
         } else {
           alert("Action error: " + (result.error || ""));
