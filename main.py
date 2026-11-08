@@ -17,7 +17,9 @@ from telegram import (
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    BotCommand
+    BotCommand,
+    WebAppInfo,
+    MenuButtonWebApp
 )
 from telegram.ext import (
     Application,
@@ -64,7 +66,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# FloodGuard Async Queue (capped at ~25 req/sec to prevent Telegram 429 errors)
+# FloodGuard Async Queue (capped at ~25 req/sec)
 floodguard_queue: asyncio.Queue = asyncio.Queue()
 
 # ============================================================================
@@ -87,7 +89,7 @@ async def floodguard_worker(tg_app: Application):
             logger.error(f"FloodGuard Unexpected Error: {e}")
         finally:
             floodguard_queue.task_done()
-            await asyncio.sleep(0.04)  # ~25 requests/second cap
+            await asyncio.sleep(0.04)
 
 # ============================================================================
 # DYNAMIC SYSTEM DEFAULTS LOADER
@@ -125,7 +127,6 @@ def compute_horizon_stats(chat_id: Optional[int] = None) -> Dict[str, int]:
 
     stats = {"joins_24h": 0, "joins_30d": 0, "joins_90d": 0}
     try:
-        # head=True queries return only count headers, saving database egress and RAM
         q_24h = supabase.table("join_logs").select("*", count="exact", head=True).gte("created_at", t_24h)
         q_30d = supabase.table("join_logs").select("*", count="exact", head=True).gte("created_at", t_30d)
         q_90d = supabase.table("join_logs").select("*", count="exact", head=True).gte("created_at", t_90d)
@@ -151,7 +152,6 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args or []
     user = update.effective_user
 
-    # Handle /start setbanner_<chat_id>
     if args and args[0].startswith("setbanner_"):
         target_channel_id = args[0].replace("setbanner_", "")
         context.user_data["awaiting_banner_for"] = target_channel_id
@@ -162,7 +162,6 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Handle /start removebanner_<chat_id>
     if args and args[0].startswith("removebanner_"):
         target_channel_id = args[0].replace("removebanner_", "")
         supabase.table("channels").update({"banner_file_id": None}).eq("chat_id", target_channel_id).execute()
@@ -179,13 +178,45 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"<b>Quick Setup:</b>\n"
         f"1. Add @{context.bot.username} as an <b>Administrator</b> in your channel with <i>Invite Users</i> permission.\n"
         f"2. Generate an invite link with <b>Request Admin Approval</b> turned ON.\n"
-        f"3. Use the <b>⚡ Dashboard</b> button below to customize your welcome cards."
+        f"3. Use the <b>⚡ Open Dashboard</b> button below to customize your welcome cards."
     )
     
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⚡ Open Dashboard", url=DASHBOARD_URL)]
+        [InlineKeyboardButton("⚡ Open Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
     ])
     await update.message.reply_text(welcome_text, parse_mode="HTML", reply_markup=keyboard)
+
+
+async def cmd_mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Real-time analytics directly in chat."""
+    user = update.effective_user
+    res = supabase.table("channels").select("*").eq("admin_id", user.id).execute()
+    channels = res.data or []
+
+    if not channels:
+        await update.message.reply_text(
+            "📊 <b>No Channels Connected</b>\n\n"
+            "You haven't added this bot to any channels yet. Promote the bot to Admin in your channel to begin.",
+            parse_mode="HTML"
+        )
+        return
+
+    text = "📊 <b>Your Channel Performance:</b>\n\n"
+    for ch in channels:
+        h = compute_horizon_stats(ch["chat_id"])
+        status = "🟢 Active" if ch.get("is_active", True) else "🔴 Paused"
+        text += (
+            f"📢 <b>{ch['chat_title']}</b>\n"
+            f"• Last 24 Hours: <b>+{h['joins_24h']}</b>\n"
+            f"• Last 30 Days: <b>{h['joins_30d']}</b>\n"
+            f"• Last 90 Days: <b>{h['joins_90d']}</b>\n"
+            f"• Status: {status}\n\n"
+        )
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⚡ Open Full Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
+    ])
+    await update.message.reply_text(text, parse_mode="HTML", reply_markup=keyboard)
 
 
 async def handle_banner_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -197,7 +228,6 @@ async def handle_banner_photo(update: Update, context: ContextTypes.DEFAULT_TYPE
     photo_file_id = update.message.photo[-1].file_id
     user_id = update.effective_user.id
 
-    # Verify authorization: Must be owner or channel admin
     ch = supabase.table("channels").select("*").eq("chat_id", target_channel_id).execute()
     if not ch.data:
         await update.message.reply_text("❌ Channel record not found.")
@@ -219,31 +249,33 @@ async def handle_banner_photo(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Auto-registers channels when the bot is promoted to Administrator."""
+    """Handles channel additions, promotions, and removals with live Admin DM alerts."""
     result = update.my_chat_member
     if not result:
         return
 
     chat = result.chat
     new_status = result.new_chat_member.status
+    old_status = result.old_chat_member.status
     admin_user = result.from_user
 
-    if new_status in ["administrator"]:
+    # Case 1: Bot Promoted to Administrator
+    if new_status == "administrator":
         existing = supabase.table("channels").select("chat_id").eq("chat_id", chat.id).execute()
+        magic_link = ""
+
+        try:
+            invite_obj = await context.bot.create_chat_invite_link(
+                chat_id=chat.id,
+                name="⚡ AutoAccept Magic Link",
+                creates_join_request=True
+            )
+            magic_link = invite_obj.invite_link
+        except Exception as e:
+            logger.warning(f"Could not auto-generate magic link: {e}")
+
         if not existing.data:
-            magic_link = ""
-            try:
-                invite_obj = await context.bot.create_chat_invite_link(
-                    chat_id=chat.id,
-                    name="⚡ AutoAccept Magic Link",
-                    creates_join_request=True
-                )
-                magic_link = invite_obj.invite_link
-            except Exception as e:
-                logger.warning(f"Could not auto-generate magic link: {e}")
-
             defaults = await get_system_channel_defaults()
-
             supabase.table("channels").insert({
                 "chat_id": chat.id,
                 "chat_title": chat.title or "Untitled Channel",
@@ -260,18 +292,47 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
                 "event_message": defaults.get("event_message", ""),
                 "is_active": True
             }).execute()
+        else:
+            supabase.table("channels").update({"is_active": True}).eq("chat_id", chat.id).execute()
 
-            logger.info(f"Registered new channel: {chat.title} ({chat.id}) for admin {admin_user.id}")
+        # Send instant confirmation DM to the Admin
+        try:
+            await context.bot.send_message(
+                chat_id=admin_user.id,
+                text=(
+                    f"✅ <b>Successfully Connected to {chat.title}!</b>\n\n"
+                    f"• Channel ID: <code>{chat.id}</code>\n"
+                    f"• Auto-Accept Engine: <b>Active</b>\n"
+                    f"• Magic Link: {magic_link if magic_link else '<i>Use existing join-request link</i>'}\n\n"
+                    f"Tap below to configure your welcome messages and smart buttons:"
+                ),
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("⚡ Open Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
+                ])
+            )
+        except Exception as e:
+            logger.info(f"Could not dispatch DM to admin {admin_user.id}: {e}")
+
+    # Case 2: Bot Demoted, Removed, or Left
+    elif new_status in ["left", "kicked", "member"] and old_status == "administrator":
+        supabase.table("channels").update({"is_active": False}).eq("chat_id", chat.id).execute()
+        try:
+            await context.bot.send_message(
+                chat_id=admin_user.id,
+                text=(
+                    f"⚠️ <b>Channel Alert: {chat.title}</b>\n\n"
+                    "The bot's administrator rights have been removed or revoked. "
+                    "Auto-approval has been paused for this channel."
+                ),
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.info(f"Could not alert admin on demotion: {e}")
 
 
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Processes join requests:
-    1. Validates blacklist and anti-bot rules.
-    2. Sends the custom welcome DM (while the request is pending).
-    3. Issues join_request.approve().
-    4. Logs metrics to Supabase.
-    """
+    """Processes incoming join requests with pre-approval DM dispatch."""
     req = update.chat_join_request
     if not req:
         return
@@ -281,18 +342,13 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     invite_link = req.invite_link
     invite_link_name = invite_link.name if (invite_link and invite_link.name) else "Default / Unnamed"
 
-    # Anti-bot check
     if user.is_bot:
-        logger.info(f"Blocked automated bot {user.id} from joining {chat_id}")
         return
 
-    # Global blacklist check
     bl = supabase.table("network_blacklist").select("id").eq("user_id", user.id).execute()
     if bl.data and len(bl.data) > 0:
-        logger.info(f"Blocked blacklisted user {user.id} from {chat_id}")
         return
 
-    # Fetch channel settings
     ch_res = supabase.table("channels").select("*").eq("chat_id", chat_id).execute()
     if not ch_res.data:
         await req.approve()
@@ -302,7 +358,6 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not channel.get("is_active", True):
         return
 
-    # Template variables replacement
     channel_title = channel.get("chat_title", req.chat.title or "Channel")
     current_time_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
 
@@ -325,7 +380,6 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"⚡ <i>Auto-Approved via @{context.bot.username}</i>"
     )
 
-    # Build buttons
     keyboard_rows = []
     btn1_text = channel.get("custom_btn_text") or f"📢 {channel_title}"
     btn1_url = channel.get("custom_btn_url") or (invite_link.invite_link if invite_link else "https://t.me")
@@ -334,7 +388,6 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     if channel.get("custom_btn_2_text") and channel.get("custom_btn_2_url"):
         keyboard_rows.append([InlineKeyboardButton(channel["custom_btn_2_text"], url=channel["custom_btn_2_url"])])
 
-    # Dynamic Owner Co-Promotion Slot
     try:
         slots_res = supabase.table("promo_slots").select("*").eq("is_active", True).execute()
         active_slots = slots_res.data or []
@@ -349,7 +402,6 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     silent = bool(channel.get("silent_dm", False))
     banner_file_id = channel.get("banner_file_id")
 
-    # PRE-APPROVAL DISPATCH: Send DM first, then approve
     async def dispatch_and_approve():
         try:
             if banner_file_id:
@@ -370,7 +422,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
                     disable_notification=silent
                 )
         except Exception as e:
-            logger.info(f"Could not send DM to {user.id} ({e})")
+            logger.info(f"Could not send DM to {user.id}: {e}")
 
         try:
             await req.approve()
@@ -406,23 +458,32 @@ async def startup_event():
 
     tg_application = ApplicationBuilder().token(BOT_TOKEN).build()
 
+    # Core Command & Update Handlers
     tg_application.add_handler(CommandHandler("start", cmd_start))
     tg_application.add_handler(CommandHandler("settings", cmd_start))
+    tg_application.add_handler(CommandHandler("mystats", cmd_mystats))
     tg_application.add_handler(ChatMemberHandler(chat_member_update_handler, ChatMemberHandler.MY_CHAT_MEMBER))
     tg_application.add_handler(ChatJoinRequestHandler(handle_join_request))
     tg_application.add_handler(MessageHandler(filters.PHOTO, handle_banner_photo))
 
     await tg_application.initialize()
     await tg_application.start()
-    await tg_application.updater.start_polling(drop_pending_updates=True)
+    
+    # Receive all update types (including chat_member & chat_join_request)
+    await tg_application.updater.start_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
 
+    # Set bottom-left native chat Menu Button directly to Mini App
     try:
+        await tg_application.bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text="⚡ Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))
+        )
         await tg_application.bot.set_my_commands([
-            BotCommand("start", "Start bot & get onboarding guide"),
-            BotCommand("settings", "Open Mini App Control Center")
+            BotCommand("start", "Launch bot & onboarding guide"),
+            BotCommand("mystats", "Quick analytics breakdown in chat"),
+            BotCommand("settings", "Open full WebApp Control Center")
         ])
     except Exception as e:
-        logger.warning(f"Could not set bot commands: {e}")
+        logger.warning(f"Could not set menu buttons: {e}")
 
     asyncio.create_task(floodguard_worker(tg_application))
     logger.info("God-Tier Telegram Bot Engine & FloodGuard successfully started.")
@@ -465,7 +526,7 @@ class MigrationRequestPayload(BaseModel):
 class MigrationActionPayload(BaseModel):
     admin_id: int
     request_id: int
-    action: str  # "approve" | "reject"
+    action: str
 
 class PromoSlotItem(BaseModel):
     slot_id: int
@@ -507,7 +568,7 @@ class SubscriberBroadcastPayload(BaseModel):
     message: str
     button_text: Optional[str] = None
     button_url: Optional[str] = None
-    target_type: str = "all"  # "all" | "channel"
+    target_type: str = "all"
     target_chat_id: Optional[int] = None
 
 # ============================================================================
@@ -515,7 +576,6 @@ class SubscriberBroadcastPayload(BaseModel):
 # ============================================================================
 @app.get("/api/channels/{admin_id}")
 async def get_admin_channels(admin_id: int):
-    """Retrieves all channels connected by an admin with multi-horizon analytics."""
     is_owner = (int(admin_id) == OWNER_ID)
     try:
         res = supabase.table("channels").select("*").eq("admin_id", admin_id).execute()
@@ -538,7 +598,6 @@ async def get_admin_channels(admin_id: int):
 
 @app.post("/api/channel/update")
 async def update_channel_config(payload: ChannelUpdatePayload):
-    """Updates custom welcome messages, buttons, and operational toggles."""
     try:
         ch = supabase.table("channels").select("admin_id").eq("chat_id", payload.chat_id).execute()
         if not ch.data:
@@ -566,7 +625,6 @@ async def update_channel_config(payload: ChannelUpdatePayload):
 
 @app.post("/api/channel/test-dm")
 async def send_test_dm(payload: TestDmPayload):
-    """Sends a sample approval card directly to the admin's Telegram account."""
     if not tg_application:
         raise HTTPException(status_code=503, detail="Telegram engine offline")
 
@@ -623,7 +681,6 @@ async def send_test_dm(payload: TestDmPayload):
 
 @app.get("/api/channel/analytics/{chat_id}")
 async def get_channel_analytics(chat_id: int):
-    """Returns join attribution breakdown by invite link name."""
     try:
         res = supabase.table("join_logs").select("invite_link_name").eq("chat_id", chat_id).execute()
         logs = res.data or []
@@ -646,7 +703,6 @@ async def get_channel_analytics(chat_id: int):
 
 @app.post("/api/channel/request-migration")
 async def request_channel_migration(payload: MigrationRequestPayload):
-    """Submits an emergency Audience Vault migration request for Owner HQ review."""
     try:
         t_90d = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
         res = supabase.table("join_logs").select("user_id").eq("chat_id", payload.chat_id).gte("created_at", t_90d).execute()
@@ -679,7 +735,6 @@ def verify_owner(admin_id: int):
 
 @app.get("/api/owner/data/{admin_id}")
 async def get_owner_dashboard_data(admin_id: int):
-    """Global telemetry matrix with 24h, 30d, 90d metrics."""
     verify_owner(admin_id)
     try:
         metrics = compute_horizon_stats(chat_id=None)
@@ -710,7 +765,6 @@ async def get_owner_dashboard_data(admin_id: int):
 
 @app.get("/api/owner/admins/{admin_id}")
 async def get_owner_admins(admin_id: int):
-    """Returns directory of all connected channel admins with their join metrics."""
     verify_owner(admin_id)
     try:
         ch_res = supabase.table("channels").select("*").execute()
@@ -753,10 +807,6 @@ async def get_owner_admins(admin_id: int):
 
 @app.get("/api/owner/admin-detail/{admin_id}/{target_admin_id}")
 async def get_admin_inspection_detail(admin_id: int, target_admin_id: int):
-    """
-    Inspection Suite: Returns full details of an admin's channels, custom DMs,
-    buttons, and links, allowing the owner to monitor and moderate content.
-    """
     verify_owner(admin_id)
     try:
         res = supabase.table("channels").select("*").eq("admin_id", target_admin_id).execute()
@@ -779,7 +829,6 @@ async def get_admin_inspection_detail(admin_id: int, target_admin_id: int):
 
 @app.post("/api/owner/channel/override")
 async def override_admin_channel(payload: ChannelOverridePayload):
-    """Owner Moderation Tool: Allows the owner to edit or sanitize DMs and buttons directly."""
     verify_owner(payload.admin_id)
     try:
         supabase.table("channels").update({
@@ -799,7 +848,6 @@ async def override_admin_channel(payload: ChannelOverridePayload):
 
 @app.get("/api/owner/defaults/{admin_id}")
 async def get_channel_defaults_api(admin_id: int):
-    """Fetches global default settings applied to newly added channels."""
     verify_owner(admin_id)
     defaults = await get_system_channel_defaults()
     return {"success": True, "defaults": defaults}
@@ -807,7 +855,6 @@ async def get_channel_defaults_api(admin_id: int):
 
 @app.post("/api/owner/defaults")
 async def save_channel_defaults_api(payload: ChannelDefaultsPayload):
-    """Saves new global defaults to Supabase without code redeployments."""
     verify_owner(payload.admin_id)
     try:
         supabase.table("system_config").upsert({
@@ -822,7 +869,6 @@ async def save_channel_defaults_api(payload: ChannelDefaultsPayload):
 
 @app.get("/api/owner/export-subscribers-csv/{admin_id}")
 async def export_subscribers_csv(admin_id: int):
-    """Streams a CSV file containing all unique subscriber records."""
     verify_owner(admin_id)
     try:
         res = supabase.table("view_unique_subscribers").select("*").execute()
@@ -856,7 +902,6 @@ async def export_subscribers_csv(admin_id: int):
 
 @app.post("/api/owner/broadcast-subscribers")
 async def broadcast_subscribers(payload: SubscriberBroadcastPayload, background_tasks: BackgroundTasks):
-    """Dispatches a private message to subscribers network-wide or filtered by channel."""
     verify_owner(payload.admin_id)
     if not tg_application:
         raise HTTPException(status_code=503, detail="Telegram engine offline")
@@ -999,7 +1044,6 @@ async def handle_migration_action(payload: MigrationActionPayload, background_ta
 
 @app.post("/api/owner/broadcast")
 async def broadcast_to_admins(payload: DirectMessagePayload):
-    """Sends a private update notice to all connected channel administrators."""
     verify_owner(payload.admin_id)
     if not tg_application:
         raise HTTPException(status_code=503, detail="Telegram engine offline")
