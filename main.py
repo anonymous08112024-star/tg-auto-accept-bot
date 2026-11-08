@@ -220,7 +220,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args or []
     user = update.effective_user
 
-    # Deep-link 1: Set channel banner photo
+    # Channel Banner setup
     if args and args[0].startswith("setbanner_"):
         target_channel_id = args[0].replace("setbanner_", "")
         context.user_data["awaiting_banner_for"] = target_channel_id
@@ -231,22 +231,31 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Deep-link 2: Set promotional broadcast photo
-    if args and args[0].startswith("setadphoto_"):
-        context.user_data["awaiting_ad_photo_for"] = user.id
-        await update.message.reply_text(
-            "📸 <b>Send the photo</b> you want to attach to your promotional broadcast.\n\n"
-            "It will be stored on Telegram's CDN and automatically attached to your promotion application draft.",
-            parse_mode="HTML"
-        )
-        return
-
-    # Deep-link 3: Remove banner photo
     if args and args[0].startswith("removebanner_"):
         target_channel_id = args[0].replace("removebanner_", "")
         supabase.table("channels").update({"banner_file_id": None}).eq("chat_id", int(target_channel_id)).execute()
         await update.message.reply_text(
             "✅ <b>Photo banner removed.</b> Approval cards have reverted to text format.",
+            parse_mode="HTML"
+        )
+        return
+
+    # Ad Broadcast Photo setup
+    if args and args[0].startswith("setadphoto_"):
+        target_user_id = args[0].replace("setadphoto_", "")
+        context.user_data["awaiting_ad_photo_for"] = target_user_id
+        await update.message.reply_text(
+            "📸 <b>Send the photo</b> you want to attach to your promotional broadcast.\n\n"
+            "The photo will be saved on Telegram's CDN and linked to your ad draft.",
+            parse_mode="HTML"
+        )
+        return
+
+    if args and args[0].startswith("removeadphoto_"):
+        target_user_id = int(args[0].replace("removeadphoto_", ""))
+        supabase.table("ad_drafts").delete().eq("user_id", target_user_id).execute()
+        await update.message.reply_text(
+            "✅ <b>Promotional banner photo removed from draft.</b>",
             parse_mode="HTML"
         )
         return
@@ -299,14 +308,14 @@ async def cmd_mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="HTML", reply_markup=keyboard)
 
 
-async def handle_incoming_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_banner_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     if not update.message.photo:
         return
 
     photo_file_id = update.message.photo[-1].file_id
-    user_id = update.effective_user.id
 
-    # CASE A: Photo for promotional broadcast draft
+    # Handle Ad Draft Photo
     if context.user_data.get("awaiting_ad_photo_for"):
         supabase.table("ad_drafts").upsert({
             "user_id": user_id,
@@ -316,16 +325,16 @@ async def handle_incoming_photo(update: Update, context: ContextTypes.DEFAULT_TY
         del context.user_data["awaiting_ad_photo_for"]
 
         await update.message.reply_text(
-            "✅ <b>Promotional photo attached successfully!</b>\n\n"
-            "Your photo is saved. Tap below to return to the dashboard and review your broadcast preview:",
+            "✅ <b>Promotional photo attached!</b>\n\n"
+            "Return to the <b>Promote</b> tab in your dashboard to test and submit your broadcast.",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("⚡ Return to Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
+                [InlineKeyboardButton("⚡ Open Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
             ])
         )
         return
 
-    # CASE B: Photo for channel approval card banner
+    # Handle Channel Banner Photo
     target_channel_id = context.user_data.get("awaiting_banner_for")
     if target_channel_id:
         ch = supabase.table("channels").select("*").eq("chat_id", int(target_channel_id)).execute()
@@ -666,7 +675,7 @@ async def startup_event():
     tg_application.add_handler(CommandHandler("mystats", cmd_mystats))
     tg_application.add_handler(ChatMemberHandler(chat_member_update_handler, ChatMemberHandler.MY_CHAT_MEMBER))
     tg_application.add_handler(ChatJoinRequestHandler(handle_join_request))
-    tg_application.add_handler(MessageHandler(filters.PHOTO, handle_incoming_photo))
+    tg_application.add_handler(MessageHandler(filters.PHOTO, handle_banner_photo))
 
     await tg_application.initialize()
     await tg_application.start()
@@ -748,19 +757,16 @@ class PromotionApplyPayload(BaseModel):
     destination_url: str
     button_text: Optional[str] = None
     broadcast_message: Optional[str] = None
-    banner_file_id: Optional[str] = None
     requested_duration: str
     custom_pitch: Optional[str] = ""
 
-class TestPreviewPayload(BaseModel):
+class PromoTestDmPayload(BaseModel):
     admin_id: int
-    broadcast_message: str
+    promo_type: str
+    community_name: Optional[str] = ""
+    destination_url: str
     button_text: Optional[str] = None
-    destination_url: Optional[str] = None
-    banner_file_id: Optional[str] = None
-
-class DraftRemovePayload(BaseModel):
-    user_id: int
+    broadcast_message: Optional[str] = None
 
 class PromotionActionPayload(BaseModel):
     admin_id: int
@@ -820,7 +826,6 @@ class SubscriberBroadcastPayload(BaseModel):
     message: str
     button_text: Optional[str] = None
     button_url: Optional[str] = None
-    banner_file_id: Optional[str] = None
     target_type: str = "all"
     target_chat_id: Optional[int] = None
 
@@ -1036,63 +1041,78 @@ async def request_channel_migration(payload: MigrationRequestPayload):
         return {"success": False, "error": str(e)}
 
 # ============================================================================
-# API ROUTES: PROMOTION MARKETPLACE & DRAFT PIPELINE
+# API ROUTES: PROMOTION MARKETPLACE & AD DRAFTS
 # ============================================================================
-@app.get("/api/promotion/draft/{user_id}")
-async def get_ad_draft(user_id: int):
+@app.get("/api/promotion/ad-draft/{admin_id}")
+async def get_ad_draft_status(admin_id: int):
     try:
-        res = supabase.table("ad_drafts").select("banner_file_id").eq("user_id", user_id).execute()
+        res = supabase.table("ad_drafts").select("banner_file_id").eq("user_id", admin_id).execute()
         if res.data and len(res.data) > 0:
-            return {"success": True, "banner_file_id": res.data[0]["banner_file_id"]}
-        return {"success": True, "banner_file_id": None}
+            return {"success": True, "has_photo": True, "banner_file_id": res.data[0]["banner_file_id"]}
+        return {"success": True, "has_photo": False, "banner_file_id": None}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "has_photo": False, "error": str(e)}
 
 
-@app.post("/api/promotion/draft/remove")
-async def remove_ad_draft(payload: DraftRemovePayload):
+@app.post("/api/promotion/ad-draft/clear/{admin_id}")
+async def clear_ad_draft_photo(admin_id: int):
     try:
-        supabase.table("ad_drafts").delete().eq("user_id", payload.user_id).execute()
+        supabase.table("ad_drafts").delete().eq("user_id", admin_id).execute()
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 
-@app.post("/api/promotion/test-preview")
-async def send_promo_test_preview(payload: TestPreviewPayload):
-    """Dispatches a 1:1 preview of the promotional broadcast directly to applicant's private DM."""
+@app.post("/api/promotion/test-dm")
+async def send_promo_test_preview(payload: PromoTestDmPayload):
+    """Dispatches a test DM preview of the promo card directly to the advertiser."""
     if not tg_application:
         raise HTTPException(status_code=503, detail="Telegram engine offline")
 
     try:
-        msg = (
-            f"🧪 <b>TEST PREVIEW: Promotional Broadcast</b>\n\n"
-            f"{payload.broadcast_message.strip() if payload.broadcast_message else 'No message text provided.'}\n\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"⚡ <i>Network Promotion • @{tg_application.bot.username}</i>"
-        )
+        # Check if user has an ad photo draft
+        d_res = supabase.table("ad_drafts").select("banner_file_id").eq("user_id", payload.admin_id).execute()
+        banner_file_id = d_res.data[0]["banner_file_id"] if (d_res.data and len(d_res.data) > 0) else None
+
         markup = None
         if payload.button_text and payload.destination_url:
-            markup = InlineKeyboardMarkup([[InlineKeyboardButton(payload.button_text.strip(), url=payload.destination_url.strip())]])
+            markup = InlineKeyboardMarkup([[InlineKeyboardButton(payload.button_text, url=payload.destination_url)]])
 
-        if payload.banner_file_id:
+        if payload.promo_type == "broadcast":
+            text = (
+                f"🧪 <b>TEST PREVIEW: Sponsored Broadcast</b>\n\n"
+                f"{payload.broadcast_message or 'Sponsored announcement text...'}\n\n"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"⚡ <i>Auto-Approved via @{tg_application.bot.username}</i>"
+            )
+        else:
+            text = (
+                f"🧪 <b>TEST PREVIEW: Welcome Card Slot</b>\n\n"
+                f"🎉 <b>Request Approved for {payload.community_name or 'Sample Channel'}!</b>\n\n"
+                f"Welcome! Your request has been approved.\n\n"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"⚡ <i>Auto-Approved via @{tg_application.bot.username}</i>"
+            )
+
+        if banner_file_id and payload.promo_type == "broadcast":
             await tg_application.bot.send_photo(
                 chat_id=payload.admin_id,
-                photo=payload.banner_file_id,
-                caption=msg,
+                photo=banner_file_id,
+                caption=text,
                 parse_mode="HTML",
                 reply_markup=markup
             )
         else:
             await tg_application.bot.send_message(
                 chat_id=payload.admin_id,
-                text=msg,
+                text=text,
                 parse_mode="HTML",
                 reply_markup=markup
             )
-        return {"success": True, "message": "Test preview delivered to your Telegram chat!"}
+
+        return {"success": True, "message": "Preview delivered to your private Telegram chat!"}
     except Exception as e:
-        logger.error(f"Error sending test preview: {e}")
+        logger.error(f"Error sending promo test preview: {e}")
         return {"success": False, "error": str(e)}
 
 
@@ -1103,41 +1123,39 @@ async def submit_promotion_application(payload: PromotionApplyPayload):
         if not enabled:
             raise HTTPException(status_code=400, detail="Promotion portal is currently disabled by Owner.")
 
-        final_file_id = payload.banner_file_id
-        if not final_file_id:
-            d_res = supabase.table("ad_drafts").select("banner_file_id").eq("user_id", payload.admin_id).execute()
-            if d_res.data and len(d_res.data) > 0:
-                final_file_id = d_res.data[0]["banner_file_id"]
+        # Check for photo draft
+        d_res = supabase.table("ad_drafts").select("banner_file_id").eq("user_id", payload.admin_id).execute()
+        banner_file_id = d_res.data[0]["banner_file_id"] if (d_res.data and len(d_res.data) > 0) else None
 
         supabase.table("promotion_applications").insert({
             "admin_id": payload.admin_id,
             "admin_username": payload.admin_username,
             "promo_type": payload.promo_type,
-            "target_channel_title": payload.community_name or "Brand Campaign",
+            "target_channel_title": payload.community_name or "Promotional Campaign",
             "button_text": payload.button_text,
             "destination_url": payload.destination_url,
             "broadcast_message": payload.broadcast_message or "",
-            "banner_file_id": final_file_id,
+            "banner_file_id": banner_file_id,
             "requested_duration": payload.requested_duration,
             "custom_pitch": payload.custom_pitch,
             "status": "pending",
             "created_at": datetime.now(timezone.utc).isoformat()
         }).execute()
 
-        # Clean up ad draft
+        # Clear draft photo
         supabase.table("ad_drafts").delete().eq("user_id", payload.admin_id).execute()
 
         if tg_application:
             admin_disp = f"@{payload.admin_username.lstrip('@')}" if payload.admin_username else f"ID: {payload.admin_id}"
             type_disp = "Slot Promotion" if payload.promo_type == "slot" else "Direct DM Broadcast"
+            has_photo_tag = " [🖼️ Photo Attached]" if banner_file_id else ""
             alert_text = (
                 f"📢 <b>NEW PROMOTION APPLICATION RECEIVED</b>\n\n"
-                f"• Type: <b>{type_disp}</b>\n"
+                f"• Type: <b>{type_disp}{has_photo_tag}</b>\n"
                 f"• Applicant: <b>{admin_disp}</b>\n"
-                f"• Community/Brand: {payload.community_name or 'N/A'}\n"
+                f"• Campaign/Brand: {payload.community_name or 'N/A'}\n"
                 f"• Button: <code>{payload.button_text or 'N/A'}</code>\n"
                 f"• URL: <code>{payload.destination_url}</code>\n"
-                f"• Photo Attached: <b>{'Yes (Telegram CDN)' if final_file_id else 'No'}</b>\n"
                 f"• Requested Package: <b>{payload.requested_duration}</b>\n\n"
                 f"👉 Open <b>⚡ Dashboard $\rightarrow$ Owner HQ</b> to review and schedule."
             )
@@ -1208,15 +1226,13 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
                 if appl.get("button_text") and appl.get("destination_url"):
                     markup = InlineKeyboardMarkup([[InlineKeyboardButton(appl["button_text"], url=appl["destination_url"])]])
 
-                photo_file_id = appl.get("banner_file_id")
-
                 job_res = supabase.table("broadcast_jobs").insert({
                     "job_type": "paid_broadcast",
                     "target_segment": f"Sponsored: {appl.get('target_channel_title', 'All')}",
                     "total_queued": len(uids),
                     "delivered_count": 0,
                     "blocked_count": 0,
-                    "banner_file_id": photo_file_id,
+                    "banner_file_id": appl.get("banner_file_id"),
                     "status": "processing",
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "updated_at": datetime.now(timezone.utc).isoformat()
@@ -1224,6 +1240,7 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
                 job_id = job_res.data[0]["id"] if job_res.data else None
 
                 b_msg = appl.get("broadcast_message") or f"📢 <b>Sponsored Announcement</b>\n\nVisit: {appl['destination_url']}"
+                banner_file_id = appl.get("banner_file_id")
 
                 async def enqueue_paid_broadcast(user_ids: List[int], msg_text: str, reply_markup, photo_id: Optional[str], j_id: Optional[int]):
                     delivered = 0
@@ -1279,7 +1296,7 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
                                 pass
                         await floodguard_queue.put((finalize_job, (), {}))
 
-                background_tasks.add_task(enqueue_paid_broadcast, uids, b_msg, markup, photo_file_id, job_id)
+                background_tasks.add_task(enqueue_paid_broadcast, uids, b_msg, markup, banner_file_id, job_id)
 
         supabase.table("promotion_applications").update({"status": "approved"}).eq("id", payload.application_id).execute()
 
@@ -1540,14 +1557,13 @@ async def broadcast_subscribers(payload: SubscriberBroadcastPayload, background_
             "total_queued": len(user_ids),
             "delivered_count": 0,
             "blocked_count": 0,
-            "banner_file_id": payload.banner_file_id,
             "status": "processing",
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat()
         }).execute()
         job_id = job_res.data[0]["id"] if job_res.data else None
 
-        async def enqueue_broadcast_jobs(uids: List[int], text: str, reply_markup, photo_id: Optional[str], j_id: Optional[int]):
+        async def enqueue_broadcast_jobs(uids: List[int], text: str, reply_markup, j_id: Optional[int]):
             delivered = 0
             blocked = 0
 
@@ -1555,21 +1571,12 @@ async def broadcast_subscribers(payload: SubscriberBroadcastPayload, background_
                 async def send_dm(target_uid=uid):
                     nonlocal delivered, blocked
                     try:
-                        if photo_id:
-                            await tg_application.bot.send_photo(
-                                chat_id=target_uid,
-                                photo=photo_id,
-                                caption=text,
-                                parse_mode="HTML",
-                                reply_markup=reply_markup
-                            )
-                        else:
-                            await tg_application.bot.send_message(
-                                chat_id=target_uid,
-                                text=text,
-                                parse_mode="HTML",
-                                reply_markup=reply_markup
-                            )
+                        await tg_application.bot.send_message(
+                            chat_id=target_uid,
+                            text=text,
+                            parse_mode="HTML",
+                            reply_markup=reply_markup
+                        )
                         delivered += 1
                     except Forbidden:
                         blocked += 1
@@ -1601,7 +1608,7 @@ async def broadcast_subscribers(payload: SubscriberBroadcastPayload, background_
                         pass
                 await floodguard_queue.put((finalize_job, (), {}))
 
-        background_tasks.add_task(enqueue_broadcast_jobs, user_ids, payload.message, markup, payload.banner_file_id, job_id)
+        background_tasks.add_task(enqueue_broadcast_jobs, user_ids, payload.message, markup, job_id)
 
         return {
             "success": True,
