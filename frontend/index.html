@@ -16,9 +16,7 @@
 </head>
 <body class="p-4 pb-28 max-w-lg mx-auto">
 
-  <!-- ========================================== -->
-  <!-- LOCKED STATE (OUTSIDE TELEGRAM BROWSER)    -->
-  <!-- ========================================== -->
+  <!-- LOCKED STATE (OUTSIDE TELEGRAM BROWSER) -->
   <div id="unauthorizedScreen" class="hidden py-20 text-center space-y-4">
     <div class="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-rose-500/10 border border-rose-500/20 text-3xl">
       🔒
@@ -36,9 +34,7 @@
     </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- MAIN APP CONTAINER                         -->
-  <!-- ========================================== -->
+  <!-- MAIN APP CONTAINER -->
   <div id="appContainer" class="hidden">
     
     <!-- Top Bar -->
@@ -143,11 +139,11 @@
                 <button id="previewBtn2" class="hidden w-full py-2 px-3 text-xs font-medium text-center bg-slate-700/80 text-white rounded-lg pointer-events-none truncate">
                   Secondary Button
                 </button>
-                <button id="previewPromoBtn" disabled class="w-full py-2 px-3 text-xs font-medium text-center bg-slate-800 text-slate-300 border border-slate-700 rounded-lg opacity-85 cursor-not-allowed truncate">
+                <button disabled class="w-full py-2 px-3 text-xs font-medium text-center bg-slate-800 text-slate-300 border border-slate-700 rounded-lg opacity-85 cursor-not-allowed truncate">
                   🔥 Network Co-Promotion Slot
                 </button>
               </div>
-              <p id="previewWatermark" class="text-[10px] text-slate-400 text-center font-medium">⚡ Auto-Approved via @AutoRequestAcceptorxBot</p>
+              <p class="text-[10px] text-slate-400 text-center font-medium">⚡ Auto-Approved via @AutoRequestAcceptorxBot</p>
             </div>
           </div>
         </div>
@@ -187,7 +183,7 @@
           </div>
         </div>
 
-        <!-- Match-Day / Event Mode -->
+        <!-- Event Mode -->
         <div class="bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl space-y-3">
           <div class="flex items-center justify-between">
             <div>
@@ -287,15 +283,15 @@
           <span>🚀</span> Network Promotion Portal
         </h3>
         <p class="text-xs text-slate-300 leading-relaxed">
-          Reach thousands of active Telegram subscribers across our high-retention auto-accept network.
+          Promote your channel or project directly to active users joining channels across our auto-accept network.
         </p>
       </div>
 
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Select Promotion Placement</label>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Select Promotion Format</label>
           <div class="grid grid-cols-2 gap-2">
-            <button type="button" id="btnTypeSlot" onclick="setPromoType('slot')" class="py-2.5 px-3 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs font-semibold transition-all">
+            <button type="button" id="btnTypeSlot" onclick="setPromoType('slot')" class="py-2.5 px-3 rounded-xl border border-amber-500/50 bg-amber-500/20 text-amber-300 text-xs font-semibold transition-all">
               Welcome Card Slot
             </button>
             <button type="button" id="btnTypeBroadcast" onclick="setPromoType('broadcast')" class="py-2.5 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold transition-all">
@@ -304,19 +300,44 @@
           </div>
         </div>
 
-        <div id="slotChannelPickerContainer">
-          <label class="block text-[11px] font-medium text-slate-400 mb-1">Select Connected Community (Optional)</label>
-          <select id="promoChannelSelect" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"></select>
-        </div>
-
         <div>
-          <label class="block text-[11px] font-medium text-slate-400 mb-1">Button Title</label>
-          <input type="text" id="promoBtnText" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="e.g. 🍿 Join Movies VIP">
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Your Community / Brand Name</label>
+          <input type="text" id="promoCommunityName" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="e.g. Cinema Hub">
         </div>
 
         <div>
           <label class="block text-[11px] font-medium text-slate-400 mb-1">Destination URL / Channel Link</label>
           <input type="url" id="promoUrl" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="https://t.me/...">
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Inline Button Title</label>
+          <input type="text" id="promoBtnText" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="e.g. 🍿 Join Movies VIP">
+        </div>
+
+        <!-- Conditional Direct DM Broadcast Fields -->
+        <div id="promoBroadcastFields" class="hidden space-y-3 pt-2 border-t border-slate-800">
+          <div>
+            <label class="block text-[11px] font-medium text-amber-400 mb-1">Broadcast Message Body (HTML Supported)</label>
+            <textarea id="promoBroadcastMessage" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="Enter message text to be delivered to subscribers' private DMs..."></textarea>
+          </div>
+
+          <!-- Native Ad Photo Attachment -->
+          <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <span id="adPhotoIndicator" class="h-2 w-2 rounded-full bg-slate-600"></span>
+              <span id="adPhotoStatusText" class="text-slate-300">Photo: None</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="attachAdPhoto()" class="text-[11px] font-semibold text-blue-400 hover:text-blue-300">
+                📸 Attach via Bot
+              </button>
+              <span id="removeAdPhotoSeparator" class="hidden text-slate-700">|</span>
+              <button type="button" id="removeAdPhotoBtn" onclick="removeAdPhoto()" class="hidden text-[11px] font-semibold text-rose-400 hover:text-rose-300">
+                Remove
+              </button>
+            </div>
+          </div>
         </div>
 
         <div>
@@ -326,19 +347,24 @@
             <option value="14_days">14 Days Dynamic Network Slot</option>
             <option value="30_days">30 Days Dynamic Network Slot</option>
             <option value="500_clicks">Performance: 500 Verified Clicks</option>
-            <option value="broadcast_1000">Sponsored Broadcast (1,000 Reach)</option>
-            <option value="broadcast_all">Full Network Broadcast (All Vault Users)</option>
+            <option value="broadcast_all">Full Network Direct DM Broadcast</option>
           </select>
         </div>
 
         <div>
-          <label class="block text-[11px] font-medium text-slate-400 mb-1">Custom Notes / Pitch to Bot Management</label>
-          <textarea id="promoPitch" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="Add specific targeting requests or barter details..."></textarea>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Notes / Pitch to Management</label>
+          <textarea id="promoPitch" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="Add details or barter traffic proposals..."></textarea>
         </div>
 
-        <button id="submitPromoAppBtn" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99] shadow-lg shadow-amber-600/20">
-          Submit Promotion Application
-        </button>
+        <!-- Test Preview Button & Submit Action -->
+        <div class="space-y-2 pt-1 border-t border-slate-800">
+          <button type="button" id="testPromoBtn" onclick="sendPromoTestDm()" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
+            📲 Send Test Preview to My Telegram
+          </button>
+          <button id="submitPromoAppBtn" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99] shadow-lg shadow-amber-600/20">
+            Submit Promotion Application
+          </button>
+        </div>
       </div>
     </div>
 
@@ -349,7 +375,7 @@
       
       <!-- Feature Flags & Master Switches -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Network Master Flags</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Network Controls</h3>
         
         <div class="flex items-center justify-between pt-1">
           <div>
@@ -360,22 +386,6 @@
             <input type="checkbox" id="flagPromoPortalToggle" class="sr-only peer">
             <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
           </label>
-        </div>
-
-        <div class="flex items-center justify-between pt-2 border-t border-slate-800">
-          <div>
-            <p class="text-xs font-semibold text-white">Pro Model for Admins</p>
-            <p class="text-[10px] text-slate-400">Activates white-label watermark stripping and ad-free tiers</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <button type="button" onclick="openProConfigModal()" class="text-[10px] text-blue-400 hover:underline font-semibold">
-              ⚙️ Customize
-            </button>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="flagProModelToggle" class="sr-only peer">
-              <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-            </label>
-          </div>
         </div>
       </div>
 
@@ -427,19 +437,19 @@
         </button>
       </div>
 
-      <!-- Promotion Marketplace Applications Queue -->
+      <!-- Promotion Applications Queue -->
       <div id="pendingPromoCard" class="hidden bg-amber-950/20 border border-amber-800/50 rounded-2xl p-4 space-y-3">
         <div class="flex items-center gap-2">
           <span class="text-base">🚀</span>
           <div>
             <h3 class="text-xs font-semibold text-amber-300">Pending Promotion Applications</h3>
-            <p class="text-[10px] text-slate-400">Admins requesting promo slot or audience broadcasts</p>
+            <p class="text-[10px] text-slate-400">Review creative copy and schedule into rotation</p>
           </div>
         </div>
         <div id="promoApplicationsList" class="space-y-3 text-xs"></div>
       </div>
 
-      <!-- Disaster Recovery Migration Review Queue -->
+      <!-- Disaster Recovery Migration Queue -->
       <div id="pendingMigrationsCard" class="hidden bg-rose-950/20 border border-rose-800/50 rounded-2xl p-4 space-y-3">
         <div class="flex items-center gap-2">
           <span class="text-base">🚨</span>
@@ -451,13 +461,13 @@
         <div id="migrationQueueList" class="space-y-3 text-xs"></div>
       </div>
 
-      <!-- Dynamic Co-Promotion Rotator with Multi-Horizon Clicks -->
+      <!-- Co-Promotion Slots & Telemetry -->
       <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3.5">
         <div>
           <h3 class="text-xs font-semibold text-white flex items-center gap-1.5">
             <span>🔥</span> Dynamic Co-Promotion Engine & Telemetry
           </h3>
-          <p class="text-[10px] text-slate-400">3 slots routed through <code>/r/{slot_id}</code> with telemetry analytics</p>
+          <p class="text-[10px] text-slate-400">3 slots routed through <code>/r/{slot_id}</code> with click metrics</p>
         </div>
         <div class="space-y-3" id="promoSlotsContainer"></div>
         <button id="savePromoSlotsBtn" class="w-full py-2.5 px-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
@@ -471,7 +481,7 @@
           <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Communities & Health Sentinel</h3>
           <span class="text-[11px] text-slate-500" id="channelCountLabel">0 Communities</span>
         </div>
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800 max-h-64 overflow-y-auto" id="masterChannelList"></div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y border-slate-800 divide-slate-800 max-h-64 overflow-y-auto" id="masterChannelList"></div>
       </div>
 
       <!-- Admins Directory -->
@@ -502,31 +512,27 @@
 
   </div>
 
-  <!-- ========================================== -->
-  <!-- NATIVE BOTTOM NAVIGATION BAR               -->
-  <!-- ========================================== -->
+  <!-- NATIVE BOTTOM NAVIGATION BAR -->
   <nav id="bottomNav" class="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-6 py-2">
     <div class="max-w-md mx-auto flex items-center justify-around">
-      <button type="button" id="navHomeBtn" onclick="switchTab('home')" class="flex flex-col items-center gap-0.5 text-blue-400 transition-colors">
-        <span class="text-lg">📢</span>
-        <span class="text-[10px] font-semibold">Home</span>
+      <button type="button" id="navHomeBtn" onclick="switchTab('home')" class="flex flex-col items-center gap-0.5 text-blue-400 font-semibold transition-colors">
+        <span class="text-lg">🏠</span>
+        <span class="text-[10px]">Home</span>
       </button>
 
       <button type="button" id="navPromoteBtn" onclick="switchTab('promote')" class="hidden flex flex-col items-center gap-0.5 text-slate-400 hover:text-white transition-colors">
         <span class="text-lg">🚀</span>
-        <span class="text-[10px] font-semibold">Promote</span>
+        <span class="text-[10px]">Promote</span>
       </button>
 
       <button type="button" id="navOwnerBtn" onclick="switchTab('owner')" class="hidden flex flex-col items-center gap-0.5 text-slate-400 hover:text-white transition-colors">
         <span class="text-lg">👑</span>
-        <span class="text-[10px] font-semibold">Owner HQ</span>
+        <span class="text-[10px]">Owner HQ</span>
       </button>
     </div>
   </nav>
 
-  <!-- ========================================== -->
-  <!-- MODAL: IN-APP MAGIC LINK GENERATOR         -->
-  <!-- ========================================== -->
+  <!-- MODAL: MAGIC LINK GENERATOR -->
   <div id="magicLinkModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -554,57 +560,13 @@
     </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- MODAL: PRO PLAN CUSTOMIZATION              -->
-  <!-- ========================================== -->
-  <div id="proConfigModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
-    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
-          <span>⚙️</span> Pro Plan Customization
-        </h3>
-        <button onclick="closeProConfigModal()" class="text-slate-400 hover:text-white text-lg font-bold px-1">✕</button>
-      </div>
-      <div class="space-y-3 text-xs">
-        <div>
-          <label class="block text-[11px] font-medium text-slate-400 mb-1">Pricing Display Text</label>
-          <input type="text" id="proPriceText" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500" value="₹199 / month">
-        </div>
-        <div>
-          <label class="block text-[11px] font-medium text-slate-400 mb-1">Duration (Days)</label>
-          <input type="number" id="proDurationDays" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500" value="30">
-        </div>
-        <div class="space-y-2 pt-1 border-t border-slate-800">
-          <p class="text-[10px] font-semibold text-slate-400">Included Pro Features:</p>
-          <label class="flex items-center justify-between bg-slate-950 p-2 rounded-xl border border-slate-800">
-            <span>Watermark Stripping (White-Label)</span>
-            <input type="checkbox" id="proFeatWatermark" checked class="accent-emerald-500">
-          </label>
-          <label class="flex items-center justify-between bg-slate-950 p-2 rounded-xl border border-slate-800">
-            <span>Disable Network Co-Promo Slot</span>
-            <input type="checkbox" id="proFeatPromoSlot" checked class="accent-emerald-500">
-          </label>
-          <label class="flex items-center justify-between bg-slate-950 p-2 rounded-xl border border-slate-800">
-            <span>Unlimited Audience Relocations</span>
-            <input type="checkbox" id="proFeatMigrations" checked class="accent-emerald-500">
-          </label>
-        </div>
-        <button onclick="saveProPlanConfig()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-xs transition-all">
-          Save Pro Configuration
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ========================================== -->
-  <!-- MODAL: ADMIN INSPECTION & OVERRIDE         -->
-  <!-- ========================================== -->
+  <!-- MODAL: ADMIN INSPECTION -->
   <div id="adminInspectModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div>
           <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
-            <span>🔍</span> Admin Moderation & White-Label Audit
+            <span>🔍</span> Admin Communities & Moderation Audit
           </h3>
           <p class="text-[11px] text-slate-400" id="inspectAdminTitle">Admin ID: ...</p>
         </div>
@@ -614,9 +576,7 @@
     </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- MODAL: DYNAMIC NEW DEFAULTS                -->
-  <!-- ========================================== -->
+  <!-- MODAL: DYNAMIC DEFAULTS -->
   <div id="defaultsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -656,9 +616,7 @@
     </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- MODAL: SUBSCRIBER BROADCAST                -->
-  <!-- ========================================== -->
+  <!-- MODAL: SUBSCRIBER BROADCAST -->
   <div id="subBroadcastModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -726,7 +684,7 @@
     const roleBadge = document.getElementById("roleBadge");
     const loading = document.getElementById("loading");
 
-    // Bottom Navigation
+    // Bottom Navigation Elements
     const navHomeBtn = document.getElementById("navHomeBtn");
     const navPromoteBtn = document.getElementById("navPromoteBtn");
     const navOwnerBtn = document.getElementById("navOwnerBtn");
@@ -764,8 +722,6 @@
     const previewMessage = document.getElementById("previewMessage");
     const previewBtn1 = document.getElementById("previewBtn1");
     const previewBtn2 = document.getElementById("previewBtn2");
-    const previewPromoBtn = document.getElementById("previewPromoBtn");
-    const previewWatermark = document.getElementById("previewWatermark");
 
     const saveBtn = document.getElementById("saveBtn");
     const testDmBtn = document.getElementById("testDmBtn");
@@ -777,17 +733,22 @@
     // Promote Section Controls
     const btnTypeSlot = document.getElementById("btnTypeSlot");
     const btnTypeBroadcast = document.getElementById("btnTypeBroadcast");
-    const slotChannelPickerContainer = document.getElementById("slotChannelPickerContainer");
-    const promoChannelSelect = document.getElementById("promoChannelSelect");
-    const promoBtnText = document.getElementById("promoBtnText");
+    const promoCommunityName = document.getElementById("promoCommunityName");
     const promoUrl = document.getElementById("promoUrl");
+    const promoBtnText = document.getElementById("promoBtnText");
+    const promoBroadcastFields = document.getElementById("promoBroadcastFields");
+    const promoBroadcastMessage = document.getElementById("promoBroadcastMessage");
+    const adPhotoIndicator = document.getElementById("adPhotoIndicator");
+    const adPhotoStatusText = document.getElementById("adPhotoStatusText");
+    const removeAdPhotoBtn = document.getElementById("removeAdPhotoBtn");
+    const removeAdPhotoSeparator = document.getElementById("removeAdPhotoSeparator");
     const promoDuration = document.getElementById("promoDuration");
     const promoPitch = document.getElementById("promoPitch");
     const submitPromoAppBtn = document.getElementById("submitPromoAppBtn");
+    const testPromoBtn = document.getElementById("testPromoBtn");
 
     // Owner HQ Controls
     const flagPromoPortalToggle = document.getElementById("flagPromoPortalToggle");
-    const flagProModelToggle = document.getElementById("flagProModelToggle");
     const liveJobsContainer = document.getElementById("liveJobsContainer");
     const m24hJoins = document.getElementById("m24hJoins");
     const m30dJoins = document.getElementById("m30dJoins");
@@ -813,13 +774,6 @@
     const mlCampaignName = document.getElementById("mlCampaignName");
     const mlResultArea = document.getElementById("mlResultArea");
     const mlResultInput = document.getElementById("mlResultInput");
-
-    const proConfigModal = document.getElementById("proConfigModal");
-    const proPriceText = document.getElementById("proPriceText");
-    const proDurationDays = document.getElementById("proDurationDays");
-    const proFeatWatermark = document.getElementById("proFeatWatermark");
-    const proFeatPromoSlot = document.getElementById("proFeatPromoSlot");
-    const proFeatMigrations = document.getElementById("proFeatMigrations");
 
     const adminInspectModal = document.getElementById("adminInspectModal");
     const inspectAdminTitle = document.getElementById("inspectAdminTitle");
@@ -849,6 +803,7 @@
     let allOwnerChannels = [];
     let selectedPromoType = "slot";
     let liveTrackerInterval = null;
+    let isPromoPortalActive = false;
 
     function authHeaders() {
       return {
@@ -863,19 +818,30 @@
       tabPromoteContent.classList.add("hidden");
       tabOwnerContent.classList.add("hidden");
 
-      navHomeBtn.className = "flex flex-col items-center gap-0.5 text-slate-400 hover:text-white transition-colors";
-      navPromoteBtn.className = "flex flex-col items-center gap-0.5 text-slate-400 hover:text-white transition-colors";
-      if (navOwnerBtn) navOwnerBtn.className = "flex flex-col items-center gap-0.5 text-slate-400 hover:text-white transition-colors";
+      navHomeBtn.classList.remove("text-blue-400", "font-semibold");
+      navHomeBtn.classList.add("text-slate-400");
+
+      navPromoteBtn.classList.remove("text-amber-400", "font-semibold");
+      navPromoteBtn.classList.add("text-slate-400");
+
+      if (navOwnerBtn) {
+        navOwnerBtn.classList.remove("text-amber-400", "font-semibold");
+        navOwnerBtn.classList.add("text-slate-400");
+      }
 
       if (tab === "home") {
         tabHomeContent.classList.remove("hidden");
-        navHomeBtn.className = "flex flex-col items-center gap-0.5 text-blue-400 font-semibold transition-colors";
-      } else if (tab === "promote") {
+        navHomeBtn.classList.add("text-blue-400", "font-semibold");
+        navHomeBtn.classList.remove("text-slate-400");
+      } else if (tab === "promote" && isPromoPortalActive) {
         tabPromoteContent.classList.remove("hidden");
-        navPromoteBtn.className = "flex flex-col items-center gap-0.5 text-amber-400 font-semibold transition-colors";
+        navPromoteBtn.classList.add("text-amber-400", "font-semibold");
+        navPromoteBtn.classList.remove("text-slate-400");
+        checkAdDraftPhoto();
       } else if (tab === "owner" && isOwner) {
         tabOwnerContent.classList.remove("hidden");
-        navOwnerBtn.className = "flex flex-col items-center gap-0.5 text-amber-400 font-semibold transition-colors";
+        navOwnerBtn.classList.add("text-amber-400", "font-semibold");
+        navOwnerBtn.classList.remove("text-slate-400");
         loadOwnerDashboard();
       }
       tg?.HapticFeedback?.selectionChanged();
@@ -888,11 +854,15 @@
           headers: authHeaders()
         });
         const data = await res.json();
-        if (data.success && data.feature_flags) {
-          if (data.feature_flags.promotion_portal_enabled) {
+        if (data.success) {
+          isPromoPortalActive = !!data.promotion_portal_enabled;
+          if (isPromoPortalActive) {
             navPromoteBtn.classList.remove("hidden");
           } else {
             navPromoteBtn.classList.add("hidden");
+            if (!tabPromoteContent.classList.contains("hidden")) {
+              switchTab("home");
+            }
           }
         }
       } catch (err) {
@@ -911,7 +881,6 @@
         if (data.success && data.channels.length > 0) {
           myChannels = data.channels;
           channelSelect.innerHTML = myChannels.map(c => `<option value="${c.chat_id}">${c.chat_title}</option>`).join("");
-          promoChannelSelect.innerHTML = `<option value="">None / External Community</option>` + myChannels.map(c => `<option value="${c.chat_id}">${c.chat_title}</option>`).join("");
           channelForm.classList.remove("hidden");
           noChannels.classList.add("hidden");
           
@@ -941,6 +910,7 @@
       if (document.visibilityState === "visible") {
         loadChannels();
         loadPublicFlags();
+        checkAdDraftPhoto();
         if (isOwner) loadOwnerDashboard();
       }
     });
@@ -972,13 +942,11 @@
           adminInspectModal?.remove();
           defaultsModal?.remove();
           subBroadcastModal?.remove();
-          proConfigModal?.remove();
         }
 
         if (data.success && data.channels.length > 0) {
           myChannels = data.channels;
           channelSelect.innerHTML = myChannels.map(c => `<option value="${c.chat_id}">${c.chat_title}</option>`).join("");
-          promoChannelSelect.innerHTML = `<option value="">None / External Community</option>` + myChannels.map(c => `<option value="${c.chat_id}">${c.chat_title}</option>`).join("");
           channelForm.classList.remove("hidden");
           selectChannel(myChannels[0].chat_id);
         } else {
@@ -1058,19 +1026,6 @@
         previewBtn2.classList.remove("hidden");
       } else {
         previewBtn2.classList.add("hidden");
-      }
-
-      // Check White-Label / Pro watermark & promo slot suppression
-      if (currentChannel.hide_watermark) {
-        previewWatermark.classList.add("hidden");
-      } else {
-        previewWatermark.classList.remove("hidden");
-      }
-
-      if (currentChannel.disable_promo_slot) {
-        previewPromoBtn.classList.add("hidden");
-      } else {
-        previewPromoBtn.classList.remove("hidden");
       }
     }
 
@@ -1296,17 +1251,104 @@
       alert("Magic Link copied to clipboard!");
     };
 
-    // Promote Portal Functions
+    // Promote Portal
     window.setPromoType = function(type) {
       selectedPromoType = type;
       if (type === "slot") {
-        btnTypeSlot.className = "py-2.5 px-3 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs font-semibold transition-all";
+        btnTypeSlot.className = "py-2.5 px-3 rounded-xl border border-amber-500/50 bg-amber-500/20 text-amber-300 text-xs font-semibold transition-all";
         btnTypeBroadcast.className = "py-2.5 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold transition-all";
-        slotChannelPickerContainer.classList.remove("hidden");
+        promoBroadcastFields.classList.add("hidden");
       } else {
-        btnTypeBroadcast.className = "py-2.5 px-3 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs font-semibold transition-all";
+        btnTypeBroadcast.className = "py-2.5 px-3 rounded-xl border border-amber-500/50 bg-amber-500/20 text-amber-300 text-xs font-semibold transition-all";
         btnTypeSlot.className = "py-2.5 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold transition-all";
-        slotChannelPickerContainer.classList.add("hidden");
+        promoBroadcastFields.classList.remove("hidden");
+        checkAdDraftPhoto();
+      }
+    };
+
+    async function checkAdDraftPhoto() {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/promotion/ad-draft/${user.id}?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: authHeaders()
+        });
+        const data = await res.json();
+        if (data.success && data.has_photo) {
+          adPhotoIndicator.className = "h-2 w-2 rounded-full bg-emerald-400";
+          adPhotoStatusText.innerText = "Photo: Attached";
+          removeAdPhotoBtn.classList.remove("hidden");
+          removeAdPhotoSeparator.classList.remove("hidden");
+        } else {
+          adPhotoIndicator.className = "h-2 w-2 rounded-full bg-slate-600";
+          adPhotoStatusText.innerText = "Photo: None";
+          removeAdPhotoBtn.classList.add("hidden");
+          removeAdPhotoSeparator.classList.add("hidden");
+        }
+      } catch (e) {
+        console.error("Ad draft check error:", e);
+      }
+    }
+
+    window.attachAdPhoto = function() {
+      const botDeepLink = `https://t.me/AutoRequestAcceptorxBot?start=setadphoto_${user.id}`;
+      if (tg && tg.openTelegramLink) {
+        tg.openTelegramLink(botDeepLink);
+        tg.close();
+      } else {
+        window.open(botDeepLink, "_blank");
+      }
+    };
+
+    window.removeAdPhoto = async function() {
+      try {
+        await fetch(`${BACKEND_URL}/api/promotion/ad-draft/clear/${user.id}`, {
+          method: "POST",
+          headers: authHeaders()
+        });
+        checkAdDraftPhoto();
+        tg?.HapticFeedback?.notificationOccurred("success");
+      } catch (e) {
+        alert("Failed to remove ad photo.");
+      }
+    };
+
+    window.sendPromoTestDm = async function() {
+      const url = promoUrl.value.trim();
+      if (!url || !url.startsWith("http")) {
+        alert("Please enter a valid destination URL before testing.");
+        return;
+      }
+
+      testPromoBtn.disabled = true;
+      testPromoBtn.innerText = "Dispatching preview...";
+
+      const payload = {
+        admin_id: user.id,
+        promo_type: selectedPromoType,
+        community_name: promoCommunityName.value.trim() || "My Project",
+        destination_url: url,
+        button_text: promoBtnText.value.trim() || "📢 Open Link",
+        broadcast_message: selectedPromoType === "broadcast" ? promoBroadcastMessage.value.trim() : ""
+      };
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/promotion/test-dm`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (result.success) {
+          tg?.HapticFeedback?.notificationOccurred("success");
+          alert("🧪 Preview card sent to your private Telegram chat!");
+        } else {
+          alert("Test failed: " + (result.error || ""));
+        }
+      } catch (e) {
+        alert("Communication error.");
+      } finally {
+        testPromoBtn.disabled = false;
+        testPromoBtn.innerText = "📲 Send Test Preview to My Telegram";
       }
     };
 
@@ -1324,10 +1366,10 @@
         admin_id: user.id,
         admin_username: user.username || "",
         promo_type: selectedPromoType,
-        target_channel_id: promoChannelSelect.value ? Number(promoChannelSelect.value) : null,
-        target_channel_title: promoChannelSelect.options[promoChannelSelect.selectedIndex]?.text || "",
+        community_name: promoCommunityName.value.trim() || "Brand Campaign",
         button_text: promoBtnText.value.trim() || null,
         destination_url: url,
+        broadcast_message: selectedPromoType === "broadcast" ? promoBroadcastMessage.value.trim() : "",
         requested_duration: promoDuration.value,
         custom_pitch: promoPitch.value.trim()
       };
@@ -1342,8 +1384,10 @@
         if (result.success) {
           tg?.HapticFeedback?.notificationOccurred("success");
           alert("🚀 Promotion application submitted successfully! Management has been notified via Telegram.");
+          promoCommunityName.value = "";
           promoUrl.value = "";
           promoBtnText.value = "";
+          promoBroadcastMessage.value = "";
           promoPitch.value = "";
           switchTab("home");
         } else {
@@ -1372,11 +1416,7 @@
         m30dJoins.innerText = (data.metrics.joins_30d || 0).toLocaleString();
         m90dJoins.innerText = (data.metrics.joins_90d || 0).toLocaleString();
 
-        // System Master Switches
-        if (data.feature_flags) {
-          flagPromoPortalToggle.checked = !!data.feature_flags.promotion_portal_enabled;
-          flagProModelToggle.checked = !!data.feature_flags.pro_model_enabled;
-        }
+        flagPromoPortalToggle.checked = !!data.promotion_portal_enabled;
 
         allOwnerChannels = data.channels || [];
         channelCountLabel.innerText = `${allOwnerChannels.length} Communities`;
@@ -1385,7 +1425,7 @@
           <option value="${c.chat_id}">${c.chat_title} (${c.subscriber_count || 0} reachable subscribers)</option>
         `).join("");
 
-        // Promo Slots with Click Telemetry
+        // Promo Slots with Telemetry
         promoSlots = data.promo_slots || [];
         promoSlotsContainer.innerHTML = promoSlots.map(slot => `
           <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2.5">
@@ -1442,7 +1482,7 @@
               <div class="truncate">
                 <p class="font-semibold text-white truncate">${ch.chat_title}</p>
                 <p class="text-[10px] text-slate-400">
-                  24h: <span class="text-blue-400">+${ch.joins_24h || 0}</span> • Subs: <span class="text-amber-400 font-medium">${ch.subscriber_count || 0}</span> • Tier: <b class="text-slate-300">${ch.tier || 'free'}</b>
+                  24h: <span class="text-blue-400">+${ch.joins_24h || 0}</span> • Subs: <span class="text-amber-400 font-medium">${ch.subscriber_count || 0}</span>
                 </p>
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
@@ -1466,38 +1506,33 @@
       }
     }
 
-    // Feature Flags Listeners
     flagPromoPortalToggle.addEventListener("change", async (e) => {
-      await updateMasterFlags(e.target.checked, flagProModelToggle.checked);
-    });
-
-    flagProModelToggle.addEventListener("change", async (e) => {
-      await updateMasterFlags(flagPromoPortalToggle.checked, e.target.checked);
-    });
-
-    async function updateMasterFlags(promoEnabled, proEnabled) {
+      const enabled = e.target.checked;
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/system/flags`, {
           method: "POST",
           headers: authHeaders(),
           body: JSON.stringify({
             admin_id: user.id,
-            promotion_portal_enabled: promoEnabled,
-            pro_model_enabled: proEnabled
+            promotion_portal_enabled: enabled
           })
         });
         const result = await res.json();
         if (result.success) {
+          isPromoPortalActive = enabled;
+          if (enabled) {
+            navPromoteBtn.classList.remove("hidden");
+          } else {
+            navPromoteBtn.classList.add("hidden");
+          }
           tg?.HapticFeedback?.notificationOccurred("success");
-          if (promoEnabled) navPromoteBtn.classList.remove("hidden");
-          else navPromoteBtn.classList.add("hidden");
         }
       } catch (e) {
-        alert("Failed to update master flags.");
+        alert("Failed to update promotion toggle.");
       }
-    }
+    });
 
-    // Live Jobs Tracker Poller
+    // Live Jobs Poller
     function startLiveTrackerPoller() {
       if (liveTrackerInterval) clearInterval(liveTrackerInterval);
       liveTrackerInterval = setInterval(refreshLiveJobs, 4000);
@@ -1520,7 +1555,7 @@
             return `
               <div class="bg-slate-950 border border-slate-800 p-2.5 rounded-xl space-y-1.5">
                 <div class="flex items-center justify-between">
-                  <span class="font-semibold text-white capitalize">${job.job_type}: ${job.target_segment}</span>
+                  <span class="font-semibold text-white capitalize">${job.job_type.replace('_', ' ')}: ${job.target_segment}</span>
                   <span class="text-[10px] ${isCompleted ? 'text-emerald-400' : 'text-amber-400'} font-bold">${isCompleted ? 'Completed' : 'Processing (~25/s)'}</span>
                 </div>
                 <div class="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
@@ -1543,7 +1578,7 @@
       }
     };
 
-    // Promotion Marketplace Applications Review
+    // Promotion Applications Review
     async function loadPendingPromotions() {
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/promotions/${user.id}?t=${Date.now()}`, {
@@ -1557,19 +1592,21 @@
             <div class="bg-slate-900 border border-amber-900/60 p-3 rounded-xl space-y-2">
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="font-bold text-white">${app.promo_type === 'slot' ? 'Slot Promo' : 'Direct Broadcast'}</p>
-                  <p class="text-[10px] text-slate-400">By: @${app.admin_username || app.admin_id} • Tier: ${app.requested_duration}</p>
+                  <p class="font-bold text-white">${app.promo_type === 'slot' ? 'Slot Promo' : 'Direct DM Broadcast'}</p>
+                  <p class="text-[10px] text-slate-400">Applicant: @${app.admin_username || app.admin_id} • Target: ${app.target_channel_title || 'N/A'}</p>
                 </div>
                 <span class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-mono">Pending</span>
               </div>
               <p class="text-[11px] text-slate-300 break-all">URL: <a href="${app.destination_url}" target="_blank" class="text-blue-400 underline">${app.destination_url}</a></p>
+              ${app.broadcast_message ? `<p class="text-[10px] text-slate-300 bg-slate-950 p-2 rounded border border-slate-800"><b>Message:</b> ${app.broadcast_message}</p>` : ''}
+              ${app.banner_file_id ? `<p class="text-[10px] text-emerald-400"><b>Photo:</b> 🖼️ Native File ID Attached</p>` : ''}
               ${app.custom_pitch ? `<p class="text-[10px] text-slate-400 italic">"${app.custom_pitch}"</p>` : ''}
               
               <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800">
-                <button onclick="handlePromoApplication(${app.id}, 'approve')" class="py-1 px-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-semibold">
+                <button onclick="handlePromoApplication(${app.id}, 'approve', '${app.promo_type}')" class="py-1 px-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-semibold">
                   Approve & Schedule
                 </button>
-                <button onclick="handlePromoApplication(${app.id}, 'reject')" class="py-1 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px]">
+                <button onclick="handlePromoApplication(${app.id}, 'reject', '${app.promo_type}')" class="py-1 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px]">
                   Reject
                 </button>
               </div>
@@ -1583,11 +1620,11 @@
       }
     }
 
-    window.handlePromoApplication = async function(appId, action) {
+    window.handlePromoApplication = async function(appId, action, promoType) {
       if (!confirm(`Are you sure you want to ${action} this application?`)) return;
       let slotId = 1;
       let days = 7;
-      if (action === "approve") {
+      if (action === "approve" && promoType === "slot") {
         const slotInput = prompt("Assign to which Slot ID (1, 2, or 3)?", "1");
         if (!slotInput) return;
         slotId = Number(slotInput);
@@ -1618,63 +1655,6 @@
         }
       } catch (e) {
         alert("Communication error.");
-      }
-    };
-
-    // Pro Plan Customization Modal
-    window.openProConfigModal = async () => {
-      proConfigModal.classList.remove("hidden");
-      try {
-        const res = await fetch(`${BACKEND_URL}/api/system/flags?t=${Date.now()}`, {
-          cache: "no-store",
-          headers: authHeaders()
-        });
-        const data = await res.json();
-        if (data.success && data.pro_plan_config) {
-          proPriceText.value = data.pro_plan_config.price_text || "₹199 / month";
-          proDurationDays.value = data.pro_plan_config.duration_days || 30;
-          proFeatWatermark.checked = !!data.pro_plan_config.features?.hide_watermark;
-          proFeatPromoSlot.checked = !!data.pro_plan_config.features?.disable_promo_slot;
-          proFeatMigrations.checked = !!data.pro_plan_config.features?.unlimited_migrations;
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    };
-
-    window.closeProConfigModal = () => proConfigModal.classList.add("hidden");
-
-    window.saveProPlanConfig = async () => {
-      const configPayload = {
-        price_text: proPriceText.value.trim(),
-        duration_days: Number(proDurationDays.value),
-        features: {
-          hide_watermark: proFeatWatermark.checked,
-          disable_promo_slot: proFeatPromoSlot.checked,
-          unlimited_migrations: proFeatMigrations.checked,
-          priority_support: true
-        }
-      };
-
-      try {
-        const res = await fetch(`${BACKEND_URL}/api/owner/system/flags`, {
-          method: "POST",
-          headers: authHeaders(),
-          body: JSON.stringify({
-            admin_id: user.id,
-            promotion_portal_enabled: flagPromoPortalToggle.checked,
-            pro_model_enabled: flagProModelToggle.checked,
-            pro_plan_config: configPayload
-          })
-        });
-        const result = await res.json();
-        if (result.success) {
-          tg?.HapticFeedback?.notificationOccurred("success");
-          alert("Pro plan configuration saved successfully!");
-          closeProConfigModal();
-        }
-      } catch (e) {
-        alert("Failed to save pro configuration.");
       }
     };
 
@@ -1756,22 +1736,10 @@
               </div>
             </div>
 
-            <!-- Pro SaaS & Watermark Controls -->
-            <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800 text-[10px]">
-              <label class="flex items-center gap-1.5 text-slate-300">
-                <input type="checkbox" id="ovHideWm_${ch.chat_id}" class="accent-emerald-500" ${ch.hide_watermark ? 'checked' : ''}>
-                <span>Hide Watermark (White-Label)</span>
-              </label>
-              <label class="flex items-center gap-1.5 text-slate-300">
-                <input type="checkbox" id="ovDisableSlot_${ch.chat_id}" class="accent-emerald-500" ${ch.disable_promo_slot ? 'checked' : ''}>
-                <span>Disable Co-Promo Slot</span>
-              </label>
-            </div>
-
             <div class="flex items-center justify-between pt-1">
               <label class="text-[11px] text-slate-300 flex items-center gap-1.5 cursor-pointer">
                 <input type="checkbox" id="ovActive_${ch.chat_id}" class="accent-emerald-500" ${ch.is_active ? 'checked' : ''}>
-                <span>Community Active</span>
+                <span>Active</span>
               </label>
               <button onclick="saveChannelOverride(${ch.chat_id})" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg text-[11px] shadow-sm">
                 Save & Override
@@ -1793,10 +1761,7 @@
         custom_message: document.getElementById(`ovMsg_${chatId}`).value.trim(),
         custom_btn_text: document.getElementById(`ovBtn1Text_${chatId}`).value.trim(),
         custom_btn_url: document.getElementById(`ovBtn1Url_${chatId}`).value.trim(),
-        is_active: document.getElementById(`ovActive_${chatId}`).checked,
-        hide_watermark: document.getElementById(`ovHideWm_${chatId}`).checked,
-        disable_promo_slot: document.getElementById(`ovDisableSlot_${chatId}`).checked,
-        tier: document.getElementById(`ovHideWm_${chatId}`).checked ? "pro" : "free"
+        is_active: document.getElementById(`ovActive_${chatId}`).checked
       };
 
       try {
@@ -1807,7 +1772,7 @@
         });
         const result = await res.json();
         if (result.success) {
-          alert("Community configuration overridden successfully!");
+          alert("Community configuration updated successfully!");
         } else {
           alert("Error: " + (result.error || ""));
         }
@@ -1816,7 +1781,7 @@
       }
     };
 
-    // Disaster Recovery Migrations Queue
+    // Migration Review Queue
     async function loadPendingMigrations() {
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/migrations/${user.id}?t=${Date.now()}`, {
@@ -1929,7 +1894,7 @@
       }
     };
 
-    // Direct Telegram DM CSV Export
+    // Export CSV
     exportCsvBtn.addEventListener("click", async () => {
       exportCsvBtn.disabled = true;
       exportCsvBtn.innerHTML = `<span class="text-xs">Dispatching...</span>`;
@@ -1954,7 +1919,7 @@
       }
     });
 
-    // Save Promo Rotation Slots
+    // Promo Slots Update
     savePromoSlotsBtn.addEventListener("click", async () => {
       savePromoSlotsBtn.disabled = true;
       savePromoSlotsBtn.innerText = "Updating slots...";
@@ -2027,6 +1992,7 @@
       }
     };
 
+    // Fixed Admin Broadcast Listener
     sendBroadcastBtn.addEventListener("click", async () => {
       const msg = broadcastInput.value.trim();
       if (!msg) return alert("Please enter an announcement.");
@@ -2045,7 +2011,7 @@
           alert(`Delivered to ${result.delivered} / ${result.total_admins} admins.`);
           broadcastInput.value = "";
         } else {
-          alert("Broadcast failed.");
+          alert("Broadcast failed: " + (result.error || result.detail || ""));
         }
       } catch (e) {
         alert("Broadcast communication error.");
