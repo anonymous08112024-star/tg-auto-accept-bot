@@ -93,8 +93,8 @@
           </select>
         </div>
 
-        <!-- Channel Horizon Metrics Matrix -->
-        <div class="grid grid-cols-4 gap-2 bg-slate-900/70 border border-slate-800 p-3 rounded-2xl text-center">
+        <!-- Channel Horizon Metrics Matrix (3-Horizon Clean View) -->
+        <div class="grid grid-cols-3 gap-2 bg-slate-900/70 border border-slate-800 p-3 rounded-2xl text-center">
           <div>
             <p class="text-[10px] text-slate-400">Last 24h</p>
             <p class="text-sm font-bold text-blue-400 mt-0.5" id="cJoins24h">0</p>
@@ -106,10 +106,6 @@
           <div>
             <p class="text-[10px] text-slate-400">90 Days</p>
             <p class="text-sm font-bold text-amber-400 mt-0.5" id="cJoins90d">0</p>
-          </div>
-          <div>
-            <p class="text-[10px] text-slate-400">All-Time</p>
-            <p class="text-sm font-bold text-white mt-0.5" id="cJoinsAll">0</p>
           </div>
         </div>
 
@@ -291,27 +287,22 @@
     <!-- ========================================== -->
     <div id="ownerSection" class="hidden space-y-6">
       
-      <!-- Precision Horizon Telemetry Matrix -->
-      <div class="grid grid-cols-2 gap-3">
-        <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
-          <p class="text-[11px] font-medium text-slate-400">Total Network Joins</p>
-          <p class="text-xl font-bold text-white mt-1" id="mTotalJoins">0</p>
-          <span class="text-[10px] text-emerald-400 font-medium">All-time processed</span>
+      <!-- Horizon Telemetry Matrix (3 Horizons: 24h, 30d, 90d) -->
+      <div class="grid grid-cols-3 gap-2.5">
+        <div class="bg-slate-900 border border-slate-800 p-3 rounded-2xl text-center">
+          <p class="text-[11px] font-medium text-slate-400">Last 24h</p>
+          <p class="text-lg font-bold text-blue-400 mt-1" id="m24hJoins">0</p>
+          <span class="text-[9px] text-blue-300">Daily velocity</span>
         </div>
-        <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
-          <p class="text-[11px] font-medium text-slate-400">Joins (Last 24h)</p>
-          <p class="text-xl font-bold text-blue-400 mt-1" id="m24hJoins">0</p>
-          <span class="text-[10px] text-blue-300 font-medium">Daily velocity</span>
-        </div>
-        <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
+        <div class="bg-slate-900 border border-slate-800 p-3 rounded-2xl text-center">
           <p class="text-[11px] font-medium text-slate-400">30-Day Joins</p>
-          <p class="text-xl font-bold text-emerald-400 mt-1" id="m30dJoins">0</p>
-          <span class="text-[10px] text-slate-400">Monthly volume</span>
+          <p class="text-lg font-bold text-emerald-400 mt-1" id="m30dJoins">0</p>
+          <span class="text-[9px] text-emerald-300">Monthly volume</span>
         </div>
-        <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
+        <div class="bg-slate-900 border border-slate-800 p-3 rounded-2xl text-center">
           <p class="text-[11px] font-medium text-slate-400">90-Day Joins</p>
-          <p class="text-xl font-bold text-amber-400 mt-1" id="m90dJoins">0</p>
-          <span class="text-[10px] text-slate-400">Quarterly reach</span>
+          <p class="text-lg font-bold text-amber-400 mt-1" id="m90dJoins">0</p>
+          <span class="text-[9px] text-amber-300">Quarterly reach</span>
         </div>
       </div>
 
@@ -517,15 +508,12 @@
       tg.ready();
     }
 
-    // STRICT AUTHENTICATION: Never fallback to Owner ID
     const rawInitData = tg?.initData || "";
     const user = tg?.initDataUnsafe?.user || null;
 
-    // Root Containers
     const unauthorizedScreen = document.getElementById("unauthorizedScreen");
     const appContainer = document.getElementById("appContainer");
 
-    // Guard: Block execution if opened outside Telegram TMA
     if (!user || !user.id || !rawInitData) {
       unauthorizedScreen.classList.remove("hidden");
       appContainer.remove();
@@ -534,7 +522,6 @@
       appContainer.classList.remove("hidden");
     }
 
-    // DOM Elements
     const roleBadge = document.getElementById("roleBadge");
     const ownerNav = document.getElementById("ownerNav");
     const tabChannelBtn = document.getElementById("tabChannelBtn");
@@ -543,7 +530,6 @@
     const ownerSection = document.getElementById("ownerSection");
     const loading = document.getElementById("loading");
 
-    // Channel Form DOM Elements
     const noChannels = document.getElementById("noChannels");
     const channelForm = document.getElementById("channelForm");
     const channelSelect = document.getElementById("channelSelect");
@@ -555,7 +541,6 @@
     const cJoins24h = document.getElementById("cJoins24h");
     const cJoins30d = document.getElementById("cJoins30d");
     const cJoins90d = document.getElementById("cJoins90d");
-    const cJoinsAll = document.getElementById("cJoinsAll");
 
     const customMessage = document.getElementById("customMessage");
     const btn1Text = document.getElementById("btn1Text");
@@ -582,8 +567,6 @@
     const migrationTargetInput = document.getElementById("migrationTargetInput");
     const requestMigrationBtn = document.getElementById("requestMigrationBtn");
 
-    // Owner Elements
-    const mTotalJoins = document.getElementById("mTotalJoins");
     const m24hJoins = document.getElementById("m24hJoins");
     const m30dJoins = document.getElementById("m30dJoins");
     const m90dJoins = document.getElementById("m90dJoins");
@@ -602,7 +585,6 @@
     const openDefaultsModalBtn = document.getElementById("openDefaultsModalBtn");
     const openSubBroadcastBtn = document.getElementById("openSubBroadcastBtn");
 
-    // Modals
     const adminInspectModal = document.getElementById("adminInspectModal");
     const inspectAdminTitle = document.getElementById("inspectAdminTitle");
     const inspectChannelsList = document.getElementById("inspectChannelsList");
@@ -647,7 +629,6 @@
         loading.classList.add("hidden");
         channelSection.classList.remove("hidden");
 
-        // Strict Owner verification (Backend confirmed + User ID confirmed)
         if (data.is_owner && Number(user.id) === 5527067319) {
           isOwner = true;
           roleBadge.innerText = "👑 Master Owner";
@@ -684,7 +665,6 @@
       cJoins24h.innerText = "+" + (currentChannel.joins_24h || 0);
       cJoins30d.innerText = currentChannel.joins_30d || 0;
       cJoins90d.innerText = currentChannel.joins_90d || 0;
-      cJoinsAll.innerText = currentChannel.total_joins || 0;
 
       customMessage.value = currentChannel.custom_message || "Welcome to {channel}! Your request has been approved.";
       btn1Text.value = currentChannel.custom_btn_text || `📢 ${currentChannel.chat_title}`;
@@ -750,7 +730,6 @@
       }
     }
 
-    // Input Listeners
     customMessage.addEventListener("input", updatePreview);
     btn1Text.addEventListener("input", updatePreview);
     btn1Url.addEventListener("input", updatePreview);
@@ -927,7 +906,6 @@
       }
     });
 
-    // Tab Navigation
     tabChannelBtn.addEventListener("click", () => {
       tabChannelBtn.className = "py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white transition-all shadow-sm";
       tabOwnerBtn.className = "py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
@@ -942,7 +920,6 @@
       ownerSection.classList.remove("hidden");
     });
 
-    // Owner HQ Loader
     async function loadOwnerDashboard() {
       if (!isOwner) return;
       try {
@@ -952,7 +929,6 @@
         const data = await res.json();
         if (!data.success) return;
 
-        mTotalJoins.innerText = (data.metrics.total_joins || 0).toLocaleString();
         m24hJoins.innerText = "+" + (data.metrics.joins_24h || 0).toLocaleString();
         m30dJoins.innerText = (data.metrics.joins_30d || 0).toLocaleString();
         m90dJoins.innerText = (data.metrics.joins_90d || 0).toLocaleString();
@@ -960,7 +936,6 @@
         allOwnerChannels = data.channels || [];
         channelCountLabel.innerText = `${allOwnerChannels.length} Channels`;
 
-        // Populate broadChannelSelect options
         broadChannelSelect.innerHTML = allOwnerChannels.map(c => `<option value="${c.chat_id}">${c.chat_title} (${c.chat_id})</option>`).join("");
 
         promoSlots = data.promo_slots || [];
@@ -985,7 +960,7 @@
             <div class="truncate">
               <p class="font-semibold text-white truncate">${ch.chat_title}</p>
               <p class="text-[10px] text-slate-400">
-                24h: <span class="text-blue-400">+${ch.joins_24h}</span> • 30d: <span class="text-emerald-400">${ch.joins_30d}</span> • Total: <span class="text-slate-300 font-medium">${ch.total_joins}</span>
+                24h: <span class="text-blue-400">+${ch.joins_24h || 0}</span> • 30d: <span class="text-emerald-400">${ch.joins_30d || 0}</span> • 90d: <span class="text-amber-400">${ch.joins_90d || 0}</span>
               </p>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
@@ -1018,16 +993,16 @@
         masterAdminList.innerHTML = data.admins.map(admin => `
           <div class="p-3 flex items-center justify-between gap-3 text-xs">
             <div class="truncate">
-              <p class="font-semibold text-white truncate">${admin.username} <span class="text-slate-500 text-[10px]">(${admin.admin_id})</span></p>
+              <p class="font-semibold text-white truncate">${admin.username}</p>
               <p class="text-[10px] text-slate-400">
-                ${admin.channels_count} Ch • 24h: <span class="text-blue-400">+${admin.joins_24h}</span> • 30d: <span class="text-emerald-400">${admin.joins_30d}</span> • Total: <span class="text-slate-300">${admin.total_joins}</span>
+                ${admin.channels_count} Ch • 24h: <span class="text-blue-400">+${admin.joins_24h || 0}</span> • 30d: <span class="text-emerald-400">${admin.joins_30d || 0}</span> • 90d: <span class="text-amber-400">${admin.joins_90d || 0}</span>
               </p>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
               <button onclick="inspectAdmin(${admin.admin_id})" class="text-[10px] px-2.5 py-1 rounded-lg font-medium bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white transition-all">
                 🔍 Inspect
               </button>
-              <button onclick="directMessageAdmin(${admin.admin_id})" class="text-[10px] px-2 py-1 rounded-lg font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700">
+              <button onclick="directMessageAdmin(${admin.admin_id})" class="text-[10px] px-2.5 py-1 rounded-lg font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700">
                 DM
               </button>
             </div>
@@ -1038,7 +1013,6 @@
       }
     }
 
-    // Owner Inspection Modal
     window.inspectAdmin = async function(targetAdminId) {
       inspectAdminTitle.innerText = `Admin ID: ${targetAdminId}`;
       inspectChannelsList.innerHTML = `<p class="text-slate-500 text-xs">Loading admin channel records...</p>`;
@@ -1059,7 +1033,7 @@
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
               <div>
                 <p class="text-xs font-bold text-white">${ch.chat_title}</p>
-                <p class="text-[10px] text-slate-400">ID: ${ch.chat_id} • 24h: <span class="text-blue-400">+${ch.joins_24h}</span> • Total: ${ch.total_joins}</p>
+                <p class="text-[10px] text-slate-400">ID: ${ch.chat_id} • 24h: <span class="text-blue-400">+${ch.joins_24h || 0}</span> • 30d: <span class="text-emerald-400">${ch.joins_30d || 0}</span> • 90d: <span class="text-amber-400">${ch.joins_90d || 0}</span></p>
               </div>
               <a href="${ch.custom_btn_url || 'https://t.me'}" target="_blank" class="text-[10px] px-2.5 py-1 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold">
                 🔗 Check Channel
@@ -1127,7 +1101,6 @@
       }
     };
 
-    // CSV Audience Export
     exportCsvBtn.addEventListener("click", async () => {
       exportCsvBtn.disabled = true;
       exportCsvBtn.innerHTML = `<span class="text-xs">Preparing CSV...</span>`;
@@ -1153,7 +1126,6 @@
       }
     });
 
-    // Defaults Modal
     openDefaultsModalBtn.addEventListener("click", async () => {
       defaultsModal.classList.remove("hidden");
       try {
@@ -1209,7 +1181,6 @@
       }
     });
 
-    // Segmented Broadcast Modal
     openSubBroadcastBtn.addEventListener("click", () => subBroadcastModal.classList.remove("hidden"));
     window.closeSubBroadcastModal = () => subBroadcastModal.classList.add("hidden");
 
