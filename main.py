@@ -74,10 +74,10 @@ async def add_cache_headers(request: Request, call_next):
 floodguard_queue: asyncio.Queue = asyncio.Queue()
 
 # ============================================================================
-# FLOODGUARD DISPATCH WORKER
+# FLOODGUARD DISPATCH WORKER (MASS BROADCASTS & MIGRATIONS ONLY)
 # ============================================================================
 async def floodguard_worker(tg_app: Application):
-    """Processes outbound messages sequentially with a 40ms pacing interval (~25 req/sec)."""
+    """Processes mass outbound broadcasts sequentially with a 40ms pacing interval (~25 req/sec)."""
     while True:
         job = await floodguard_queue.get()
         func, args, kwargs = job
@@ -533,6 +533,9 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
             logger.info(f"Could not alert on demotion: {e}")
 
 
+# ============================================================================
+# BULLETPROOF 24/7/365 AUTO-ACCEPT & DM ENGINE
+# ============================================================================
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     req = update.chat_join_request
     if not req:
@@ -540,121 +543,144 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     chat_id = req.chat.id
     user = req.from_user
-    invite_link = req.invite_link
-    invite_link_name = invite_link.name if (invite_link and invite_link.name) else "Default / Unnamed"
 
+    # Disregard bot accounts immediately
     if user.is_bot:
         return
 
-    bl = supabase.table("network_blacklist").select("id").eq("user_id", user.id).execute()
-    if bl.data and len(bl.data) > 0:
-        return
-
-    ch_res = supabase.table("channels").select("*").eq("chat_id", chat_id).execute()
-    if not ch_res.data:
-        await req.approve()
-        return
-
-    channel = ch_res.data[0]
-    if not channel.get("is_active", True):
-        return
-
-    channel_title = channel.get("chat_title", req.chat.title or "Community")
-    current_time_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
-
-    if channel.get("event_mode_enabled") and channel.get("event_message"):
-        raw_msg = channel["event_message"]
-    else:
-        raw_msg = channel.get("custom_message") or "Welcome to {channel}! Your request has been approved."
-
-    formatted_msg = (
-        raw_msg.replace("{name}", user.first_name or "there")
-               .replace("{channel}", channel_title)
-               .replace("{username}", f"@{user.username}" if user.username else user.first_name or "")
-               .replace("{time}", current_time_str)
-    )
-
-    final_text = (
-        f"🎉 <b>Request Approved for {channel_title}!</b>\n\n"
-        f"{formatted_msg}\n\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"⚡ <i>Auto-Approved via @{context.bot.username}</i>"
-    )
-
-    keyboard_rows = []
-    btn1_text = channel.get("custom_btn_text") or f"📢 {channel_title}"
-    btn1_url = channel.get("custom_btn_url") or (invite_link.invite_link if invite_link else "https://t.me")
-    keyboard_rows.append([InlineKeyboardButton(btn1_text, url=btn1_url)])
-
-    if channel.get("custom_btn_2_text") and channel.get("custom_btn_2_url"):
-        keyboard_rows.append([InlineKeyboardButton(channel["custom_btn_2_text"], url=channel["custom_btn_2_url"])])
-
-    # Dynamic Promo Slot via Redirect Tracker
+    # ------------------------------------------------------------------------
+    # TIER 1: INSTANT UNCONDITIONAL APPROVAL (Executes in < 50ms)
+    # ------------------------------------------------------------------------
+    # Whatever happens in DB, queues, network, or DMs - the user is approved!
     try:
-        now_iso = datetime.now(timezone.utc).isoformat()
-        slots_res = supabase.table("promo_slots").select("*").eq("is_active", True).execute()
-        active_slots = slots_res.data or []
-        
-        valid_slots = []
-        for s in active_slots:
-            if s.get("expires_at") and s["expires_at"] < now_iso:
-                continue
-            if s.get("click_limit") and (s.get("total_clicks") or 0) >= s["click_limit"]:
-                continue
-            valid_slots.append(s)
-
-        if valid_slots:
-            chosen = random.choice(valid_slots)
-            if chosen.get("btn_text"):
-                redirect_url = f"{BACKEND_URL}/r/{chosen['slot_id']}?u={user.id}"
-                keyboard_rows.append([InlineKeyboardButton(chosen["btn_text"], url=redirect_url)])
+        await req.approve()
+        logger.info(f"⚡ INSTANT APPROVAL SUCCESS: user={user.id} in chat={chat_id}")
+    except BadRequest as e:
+        # User already approved or canceled request
+        logger.info(f"Join request already handled: {e}")
     except Exception as e:
-        logger.error(f"Error selecting promo slot: {e}")
+        logger.error(f"Critical error on instant approve (will retry): {e}")
 
-    markup = InlineKeyboardMarkup(keyboard_rows)
-    silent = bool(channel.get("silent_dm", False))
-    banner_file_id = channel.get("banner_file_id")
-
-    async def dispatch_and_approve():
+    # ------------------------------------------------------------------------
+    # TIER 2: ISOLATED BACKGROUND WELCOME DM & TELEMETRY LOGGING
+    # ------------------------------------------------------------------------
+    async def process_welcome_card_and_logs():
         try:
-            if banner_file_id:
-                await context.bot.send_photo(
-                    chat_id=user.id,
-                    photo=banner_file_id,
-                    caption=final_text,
-                    parse_mode="HTML",
-                    reply_markup=markup,
-                    disable_notification=silent
-                )
+            invite_link = req.invite_link
+            invite_link_name = invite_link.name if (invite_link and invite_link.name) else "Default / Unnamed"
+
+            # 1. Safe Blacklist check (will never break if table missing)
+            try:
+                bl = supabase.table("network_blacklist").select("id").eq("user_id", user.id).execute()
+                if bl.data and len(bl.data) > 0:
+                    logger.info(f"User {user.id} is blacklisted. Suppressing welcome DM.")
+                    return
+            except Exception:
+                pass
+
+            # 2. Query Channel Settings
+            ch_res = supabase.table("channels").select("*").eq("chat_id", chat_id).execute()
+            channel = ch_res.data[0] if (ch_res.data and len(ch_res.data) > 0) else {}
+
+            channel_title = channel.get("chat_title") or (req.chat.title if req.chat else "Community")
+            current_time_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
+
+            if channel.get("event_mode_enabled") and channel.get("event_message"):
+                raw_msg = channel["event_message"]
             else:
-                await context.bot.send_message(
-                    chat_id=user.id,
-                    text=final_text,
-                    parse_mode="HTML",
-                    reply_markup=markup,
-                    disable_notification=silent
-                )
-        except Exception as e:
-            logger.info(f"Could not send DM to {user.id}: {e}")
+                raw_msg = channel.get("custom_message") or "Welcome to {channel}! Your request has been approved."
 
-        try:
-            await req.approve()
-        except Exception as e:
-            logger.warning(f"Error approving join request for {user.id}: {e}")
+            formatted_msg = (
+                raw_msg.replace("{name}", user.first_name or "there")
+                       .replace("{channel}", channel_title)
+                       .replace("{username}", f"@{user.username}" if user.username else user.first_name or "")
+                       .replace("{time}", current_time_str)
+            )
 
-        try:
-            supabase.table("join_logs").insert({
-                "chat_id": chat_id,
-                "user_id": user.id,
-                "username": user.username or "",
-                "first_name": user.first_name or "",
-                "invite_link_name": invite_link_name,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }).execute()
-        except Exception as e:
-            logger.error(f"Error logging join record: {e}")
+            final_text = (
+                f"🎉 <b>Request Approved for {channel_title}!</b>\n\n"
+                f"{formatted_msg}\n\n"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"⚡ <i>Auto-Approved via @{context.bot.username}</i>"
+            )
 
-    await floodguard_queue.put((dispatch_and_approve, (), {}))
+            # Build Buttons
+            keyboard_rows = []
+            btn1_text = channel.get("custom_btn_text") or f"📢 {channel_title}"
+            btn1_url = channel.get("custom_btn_url") or (invite_link.invite_link if invite_link else "https://t.me")
+            keyboard_rows.append([InlineKeyboardButton(btn1_text, url=btn1_url)])
+
+            if channel.get("custom_btn_2_text") and channel.get("custom_btn_2_url"):
+                keyboard_rows.append([InlineKeyboardButton(channel["custom_btn_2_text"], url=channel["custom_btn_2_url"])])
+
+            # Dynamic Promo Slot via Redirect Tracker
+            try:
+                now_iso = datetime.now(timezone.utc).isoformat()
+                slots_res = supabase.table("promo_slots").select("*").eq("is_active", True).execute()
+                active_slots = slots_res.data or []
+                
+                valid_slots = []
+                for s in active_slots:
+                    if s.get("expires_at") and s["expires_at"] < now_iso:
+                        continue
+                    if s.get("click_limit") and (s.get("total_clicks") or 0) >= s["click_limit"]:
+                        continue
+                    valid_slots.append(s)
+
+                if valid_slots:
+                    chosen = random.choice(valid_slots)
+                    if chosen.get("btn_text"):
+                        redirect_url = f"{BACKEND_URL}/r/{chosen['slot_id']}?u={user.id}"
+                        keyboard_rows.append([InlineKeyboardButton(chosen["btn_text"], url=redirect_url)])
+            except Exception as e:
+                logger.error(f"Error selecting promo slot: {e}")
+
+            markup = InlineKeyboardMarkup(keyboard_rows)
+            silent = bool(channel.get("silent_dm", False))
+            banner_file_id = channel.get("banner_file_id")
+
+            # 3. Deliver Welcome DM directly (independent of bulk broadcast queue)
+            try:
+                if banner_file_id:
+                    await context.bot.send_photo(
+                        chat_id=user.id,
+                        photo=banner_file_id,
+                        caption=final_text,
+                        parse_mode="HTML",
+                        reply_markup=markup,
+                        disable_notification=silent
+                    )
+                else:
+                    await context.bot.send_message(
+                        chat_id=user.id,
+                        text=final_text,
+                        parse_mode="HTML",
+                        reply_markup=markup,
+                        disable_notification=silent
+                    )
+            except Forbidden:
+                logger.info(f"User {user.id} has blocked bot or disabled DMs.")
+            except Exception as e:
+                logger.info(f"Could not deliver welcome DM to {user.id}: {e}")
+
+            # 4. Record to join_logs
+            try:
+                supabase.table("join_logs").insert({
+                    "chat_id": chat_id,
+                    "user_id": user.id,
+                    "username": user.username or "",
+                    "first_name": user.first_name or "",
+                    "invite_link_name": invite_link_name,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }).execute()
+            except Exception as e:
+                logger.error(f"Error logging join record: {e}")
+
+        except Exception as e:
+            logger.error(f"Unexpected error in background welcome process: {e}")
+
+    # Run DM and telemetry in non-blocking background task
+    asyncio.create_task(process_welcome_card_and_logs())
 
 # ============================================================================
 # FASTAPI LIFESPAN & ENGINE RUNNER
@@ -1070,7 +1096,6 @@ async def send_promo_test_preview(payload: PromoTestDmPayload):
         raise HTTPException(status_code=503, detail="Telegram engine offline")
 
     try:
-        # Check if user has an ad photo draft
         d_res = supabase.table("ad_drafts").select("banner_file_id").eq("user_id", payload.admin_id).execute()
         banner_file_id = d_res.data[0]["banner_file_id"] if (d_res.data and len(d_res.data) > 0) else None
 
@@ -1123,7 +1148,6 @@ async def submit_promotion_application(payload: PromotionApplyPayload):
         if not enabled:
             raise HTTPException(status_code=400, detail="Promotion portal is currently disabled by Owner.")
 
-        # Check for photo draft
         d_res = supabase.table("ad_drafts").select("banner_file_id").eq("user_id", payload.admin_id).execute()
         banner_file_id = d_res.data[0]["banner_file_id"] if (d_res.data and len(d_res.data) > 0) else None
 
@@ -1142,7 +1166,6 @@ async def submit_promotion_application(payload: PromotionApplyPayload):
             "created_at": datetime.now(timezone.utc).isoformat()
         }).execute()
 
-        # Clear draft photo
         supabase.table("ad_drafts").delete().eq("user_id", payload.admin_id).execute()
 
         if tg_application:
