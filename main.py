@@ -25,7 +25,9 @@ from telegram.ext import (
     ChatJoinRequestHandler,
     ChatMemberHandler,
     CommandHandler,
-    ContextTypes
+    MessageHandler,
+    ContextTypes,
+    filters
 )
 from telegram.error import TelegramError, Forbidden, BadRequest
 from supabase import create_client, Client
@@ -112,13 +114,42 @@ async def get_system_channel_defaults() -> Dict[str, Any]:
     return fallback
 
 # ============================================================================
-# TELEGRAM HANDLERS
+# HELPER: HORIZON ANALYTICS CALCULATOR (ZERO ROW EGRESS)
+# ============================================================================
+def compute_horizon_stats(chat_id: Optional[int] = None) -> Dict[str, int]:
+    """Computes joins across 24h, 30d, and 90d horizon windows with zero row payload."""
+    now = datetime.now(timezone.utc)
+    t_24h = (now - timedelta(hours=24)).isoformat()
+    t_30d = (now - timedelta(days=30)).isoformat()
+    t_90d = (now - timedelta(days=90)).isoformat()
+
+    stats = {"joins_24h": 0, "joins_30d": 0, "joins_90d": 0}
+    try:
+        # head=True queries return only count headers, saving database egress and RAM
+        q_24h = supabase.table("join_logs").select("*", count="exact", head=True).gte("created_at", t_24h)
+        q_30d = supabase.table("join_logs").select("*", count="exact", head=True).gte("created_at", t_30d)
+        q_90d = supabase.table("join_logs").select("*", count="exact", head=True).gte("created_at", t_90d)
+
+        if chat_id is not None:
+            q_24h = q_24h.eq("chat_id", chat_id)
+            q_30d = q_30d.eq("chat_id", chat_id)
+            q_90d = q_90d.eq("chat_id", chat_id)
+
+        stats["joins_24h"] = q_24h.execute().count or 0
+        stats["joins_30d"] = q_30d.execute().count or 0
+        stats["joins_90d"] = q_90d.execute().count or 0
+    except Exception as e:
+        logger.error(f"Error calculating horizon stats: {e}")
+
+    return stats
+
+# ============================================================================
+# TELEGRAM BOT HANDLERS
 # ============================================================================
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Deep-link & onboarding handler."""
     args = context.args or []
     user = update.effective_user
-    chat_id = update.effective_chat.id
 
     # Handle /start setbanner_<chat_id>
     if args and args[0].startswith("setbanner_"):
@@ -198,10 +229,8 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
     admin_user = result.from_user
 
     if new_status in ["administrator"]:
-        # Verify if channel already exists
-        existing = supabase.table("channels").select("*").eq("chat_id", chat.id).execute()
+        existing = supabase.table("channels").select("chat_id").eq("chat_id", chat.id).execute()
         if not existing.data:
-            # Generate primary magic invite link
             magic_link = ""
             try:
                 invite_obj = await context.bot.create_chat_invite_link(
@@ -213,7 +242,6 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
             except Exception as e:
                 logger.warning(f"Could not auto-generate magic link: {e}")
 
-            # Inherit dynamic system defaults
             defaults = await get_system_channel_defaults()
 
             supabase.table("channels").insert({
@@ -267,7 +295,6 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Fetch channel settings
     ch_res = supabase.table("channels").select("*").eq("chat_id", chat_id).execute()
     if not ch_res.data:
-        # Unregistered channel: approve directly
         await req.approve()
         return
 
@@ -275,7 +302,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not channel.get("is_active", True):
         return
 
-    # Prepare message copy with template variables
+    # Template variables replacement
     channel_title = channel.get("chat_title", req.chat.title or "Channel")
     current_time_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
 
@@ -300,13 +327,10 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # Build buttons
     keyboard_rows = []
-    
-    # Primary button
     btn1_text = channel.get("custom_btn_text") or f"📢 {channel_title}"
     btn1_url = channel.get("custom_btn_url") or (invite_link.invite_link if invite_link else "https://t.me")
     keyboard_rows.append([InlineKeyboardButton(btn1_text, url=btn1_url)])
 
-    # Secondary button
     if channel.get("custom_btn_2_text") and channel.get("custom_btn_2_url"):
         keyboard_rows.append([InlineKeyboardButton(channel["custom_btn_2_text"], url=channel["custom_btn_2_url"])])
 
@@ -327,7 +351,6 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # PRE-APPROVAL DISPATCH: Send DM first, then approve
     async def dispatch_and_approve():
-        # Dispatch DM
         try:
             if banner_file_id:
                 await context.bot.send_photo(
@@ -349,13 +372,11 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception as e:
             logger.info(f"Could not send DM to {user.id} ({e})")
 
-        # Approve join request
         try:
             await req.approve()
         except Exception as e:
             logger.warning(f"Error approving join request for {user.id}: {e}")
 
-        # Record analytics log
         try:
             supabase.table("join_logs").insert({
                 "chat_id": chat_id,
@@ -365,13 +386,9 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
                 "invite_link_name": invite_link_name,
                 "created_at": datetime.now(timezone.utc).isoformat()
             }).execute()
-
-            # Increment channel counter
-            supabase.rpc("increment_channel_joins", {"row_chat_id": chat_id}).execute()
         except Exception as e:
             logger.error(f"Error logging join record: {e}")
 
-    # Enqueue to FloodGuard
     await floodguard_queue.put((dispatch_and_approve, (), {}))
 
 # ============================================================================
@@ -381,7 +398,7 @@ tg_application: Optional[Application] = None
 
 @app.on_event("startup")
 async def startup_event():
-    """Initializes the Telegram Bot engine and starts FloodGuard worker."""
+    """Initializes Telegram Bot engine and starts FloodGuard worker."""
     global tg_application
     if not BOT_TOKEN:
         logger.error("BOT_TOKEN is missing. Telegram engine will not start.")
@@ -389,26 +406,20 @@ async def startup_event():
 
     tg_application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Handlers
     tg_application.add_handler(CommandHandler("start", cmd_start))
+    tg_application.add_handler(CommandHandler("settings", cmd_start))
     tg_application.add_handler(ChatMemberHandler(chat_member_update_handler, ChatMemberHandler.MY_CHAT_MEMBER))
     tg_application.add_handler(ChatJoinRequestHandler(handle_join_request))
-    tg_application.add_handler(telegram_photo_handler := CommandHandler("settings", cmd_start))
-    
-    from telegram.ext import MessageHandler, filters
     tg_application.add_handler(MessageHandler(filters.PHOTO, handle_banner_photo))
 
-    # Initialize and run FloodGuard worker
     await tg_application.initialize()
     await tg_application.start()
     await tg_application.updater.start_polling(drop_pending_updates=True)
 
-    # Set Telegram native menu button commands
     try:
         await tg_application.bot.set_my_commands([
             BotCommand("start", "Start bot & get onboarding guide"),
-            BotCommand("settings", "Open Mini App Control Center"),
-            BotCommand("mystats", "View channel join analytics")
+            BotCommand("settings", "Open Mini App Control Center")
         ])
     except Exception as e:
         logger.warning(f"Could not set bot commands: {e}")
@@ -500,38 +511,6 @@ class SubscriberBroadcastPayload(BaseModel):
     target_chat_id: Optional[int] = None
 
 # ============================================================================
-# HELPER: HORIZON ANALYTICS CALCULATOR
-# ============================================================================
-def compute_horizon_stats(chat_id: Optional[int] = None) -> Dict[str, int]:
-    """Computes joins across 24h, 30d, 90d, and all-time windows."""
-    now = datetime.now(timezone.utc)
-    t_24h = (now - timedelta(hours=24)).isoformat()
-    t_30d = (now - timedelta(days=30)).isoformat()
-    t_90d = (now - timedelta(days=90)).isoformat()
-
-    stats = {"joins_24h": 0, "joins_30d": 0, "joins_90d": 0, "total_joins": 0}
-    try:
-        query_all = supabase.table("join_logs").select("id", count="exact")
-        query_24h = supabase.table("join_logs").select("id", count="exact").gte("created_at", t_24h)
-        query_30d = supabase.table("join_logs").select("id", count="exact").gte("created_at", t_30d)
-        query_90d = supabase.table("join_logs").select("id", count="exact").gte("created_at", t_90d)
-
-        if chat_id is not None:
-            query_all = query_all.eq("chat_id", chat_id)
-            query_24h = query_24h.eq("chat_id", chat_id)
-            query_30d = query_30d.eq("chat_id", chat_id)
-            query_90d = query_90d.eq("chat_id", chat_id)
-
-        stats["total_joins"] = query_all.execute().count or 0
-        stats["joins_24h"] = query_24h.execute().count or 0
-        stats["joins_30d"] = query_30d.execute().count or 0
-        stats["joins_90d"] = query_90d.execute().count or 0
-    except Exception as e:
-        logger.error(f"Error calculating horizon stats: {e}")
-
-    return stats
-
-# ============================================================================
 # API ROUTES: CHANNEL ADMIN SUITE
 # ============================================================================
 @app.get("/api/channels/{admin_id}")
@@ -542,7 +521,6 @@ async def get_admin_channels(admin_id: int):
         res = supabase.table("channels").select("*").eq("admin_id", admin_id).execute()
         channels = res.data or []
 
-        # Attach 24h, 30d, 90d analytics to each channel
         for ch in channels:
             h_stats = compute_horizon_stats(ch["chat_id"])
             ch["joins_24h"] = h_stats["joins_24h"]
@@ -562,7 +540,6 @@ async def get_admin_channels(admin_id: int):
 async def update_channel_config(payload: ChannelUpdatePayload):
     """Updates custom welcome messages, buttons, and operational toggles."""
     try:
-        # Authorization check: Owner or Channel Admin
         ch = supabase.table("channels").select("admin_id").eq("chat_id", payload.chat_id).execute()
         if not ch.data:
             raise HTTPException(status_code=404, detail="Channel not found")
@@ -671,7 +648,6 @@ async def get_channel_analytics(chat_id: int):
 async def request_channel_migration(payload: MigrationRequestPayload):
     """Submits an emergency Audience Vault migration request for Owner HQ review."""
     try:
-        # Calculate 90-day active audience size
         t_90d = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
         res = supabase.table("join_logs").select("user_id").eq("chat_id", payload.chat_id).gte("created_at", t_90d).execute()
         users = set(r["user_id"] for r in (res.data or []))
@@ -703,21 +679,18 @@ def verify_owner(admin_id: int):
 
 @app.get("/api/owner/data/{admin_id}")
 async def get_owner_dashboard_data(admin_id: int):
-    """Global telemetry matrix with 24h, 30d, 90d, all-time metrics."""
+    """Global telemetry matrix with 24h, 30d, 90d metrics."""
     verify_owner(admin_id)
     try:
         metrics = compute_horizon_stats(chat_id=None)
 
-        # Count total channels
         ch_res = supabase.table("channels").select("chat_id, is_active").execute()
         channels = ch_res.data or []
         metrics["total_channels"] = len(channels)
         metrics["active_channels"] = sum(1 for c in channels if c.get("is_active", True))
 
-        # Promo slots
         slots = supabase.table("promo_slots").select("*").order("slot_id").execute().data or []
 
-        # Master channel list with 24h & all-time counts
         all_channels = supabase.table("channels").select("*").order("created_at", desc=True).execute().data or []
         for c in all_channels:
             c_stats = compute_horizon_stats(c["chat_id"])
@@ -740,7 +713,7 @@ async def get_owner_admins(admin_id: int):
     """Returns directory of all connected channel admins with their join metrics."""
     verify_owner(admin_id)
     try:
-        ch_res = supabase.table("channels").select("admin_id, admin_username, chat_title, total_joins, chat_id").execute()
+        ch_res = supabase.table("channels").select("*").execute()
         channels = ch_res.data or []
 
         admins_map: Dict[int, Dict[str, Any]] = {}
@@ -748,26 +721,33 @@ async def get_owner_admins(admin_id: int):
             aid = c.get("admin_id")
             if not aid:
                 continue
+            aid = int(aid)
             if aid not in admins_map:
+                uname = c.get("admin_username")
+                if aid == OWNER_ID:
+                    disp_name = "Surendra (Master Owner)"
+                elif uname:
+                    disp_name = f"@{uname.lstrip('@')}"
+                else:
+                    disp_name = f"Admin ({aid})"
+
                 admins_map[aid] = {
                     "admin_id": aid,
-                    "username": f"@{c['admin_username']}" if c.get("admin_username") else "No username",
+                    "username": disp_name,
                     "channels_count": 0,
-                    "total_joins": 0,
                     "joins_24h": 0,
                     "joins_30d": 0,
                     "joins_90d": 0
                 }
             admins_map[aid]["channels_count"] += 1
-            admins_map[aid]["total_joins"] += (c.get("total_joins") or 0)
-            
-            c_stats = compute_horizon_stats(c["chat_id"])
+            c_stats = compute_horizon_stats(c.get("chat_id"))
             admins_map[aid]["joins_24h"] += c_stats["joins_24h"]
             admins_map[aid]["joins_30d"] += c_stats["joins_30d"]
             admins_map[aid]["joins_90d"] += c_stats["joins_90d"]
 
         return {"success": True, "admins": list(admins_map.values())}
     except Exception as e:
+        logger.error(f"Error in get_owner_admins: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -799,10 +779,7 @@ async def get_admin_inspection_detail(admin_id: int, target_admin_id: int):
 
 @app.post("/api/owner/channel/override")
 async def override_admin_channel(payload: ChannelOverridePayload):
-    """
-    Owner Moderation Tool: Allows the owner to directly edit, sanitize, or wipe
-    inappropriate custom DMs or scam links without removing the channel.
-    """
+    """Owner Moderation Tool: Allows the owner to edit or sanitize DMs and buttons directly."""
     verify_owner(payload.admin_id)
     try:
         supabase.table("channels").update({
@@ -822,7 +799,7 @@ async def override_admin_channel(payload: ChannelOverridePayload):
 
 @app.get("/api/owner/defaults/{admin_id}")
 async def get_channel_defaults_api(admin_id: int):
-    """Fetches the global default settings applied to all newly added channels."""
+    """Fetches global default settings applied to newly added channels."""
     verify_owner(admin_id)
     defaults = await get_system_channel_defaults()
     return {"success": True, "defaults": defaults}
@@ -830,7 +807,7 @@ async def get_channel_defaults_api(admin_id: int):
 
 @app.post("/api/owner/defaults")
 async def save_channel_defaults_api(payload: ChannelDefaultsPayload):
-    """Saves new global defaults to Supabase without requiring code redeployments."""
+    """Saves new global defaults to Supabase without code redeployments."""
     verify_owner(payload.admin_id)
     try:
         supabase.table("system_config").upsert({
@@ -848,7 +825,6 @@ async def export_subscribers_csv(admin_id: int):
     """Streams a CSV file containing all unique subscriber records."""
     verify_owner(admin_id)
     try:
-        # Fetch deduplicated audience view
         res = supabase.table("view_unique_subscribers").select("*").execute()
         rows = res.data or []
 
@@ -880,17 +856,12 @@ async def export_subscribers_csv(admin_id: int):
 
 @app.post("/api/owner/broadcast-subscribers")
 async def broadcast_subscribers(payload: SubscriberBroadcastPayload, background_tasks: BackgroundTasks):
-    """
-    Dispatches a private message to subscribers:
-    - target_type='all': Enqueues to every unique subscriber across the network.
-    - target_type='channel': Enqueues only to subscribers who joined via a specific channel.
-    """
+    """Dispatches a private message to subscribers network-wide or filtered by channel."""
     verify_owner(payload.admin_id)
     if not tg_application:
         raise HTTPException(status_code=503, detail="Telegram engine offline")
 
     try:
-        # Determine audience IDs
         if payload.target_type == "channel" and payload.target_chat_id:
             res = supabase.table("join_logs").select("user_id").eq("chat_id", payload.target_chat_id).execute()
         else:
@@ -996,7 +967,6 @@ async def handle_migration_action(payload: MigrationActionPayload, background_ta
             supabase.table("migration_requests").update({"status": "rejected"}).eq("id", payload.request_id).execute()
             return {"success": True, "message": "Rejected"}
 
-        # Fetch past 90-day users for that channel
         t_90d = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
         u_res = supabase.table("join_logs").select("user_id").eq("chat_id", req["channel_id"]).gte("created_at", t_90d).execute()
         uids = list(set(r["user_id"] for r in (u_res.data or [])))
