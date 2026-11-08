@@ -86,9 +86,14 @@
 
       <div id="channelForm" class="space-y-5 hidden">
         
-        <!-- Target Channel Selector -->
+        <!-- Target Channel Selector with Instant Refresh Button -->
         <div class="space-y-2">
-          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Target Channel</label>
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Target Channel</label>
+            <button type="button" id="refreshChannelsBtn" onclick="refreshChannelsList()" class="text-[11px] text-blue-400 font-semibold hover:underline flex items-center gap-1">
+              🔄 Refresh List
+            </button>
+          </div>
           <select id="channelSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
           </select>
         </div>
@@ -308,13 +313,13 @@
 
       <!-- Quick Action Controls: CSV Export, Defaults, Subscriber Broadcast -->
       <div class="grid grid-cols-3 gap-2">
-        <button id="exportCsvBtn" class="py-2.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-semibold text-emerald-400 flex flex-col items-center justify-center gap-1">
+        <button id="exportCsvBtn" class="py-2.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-semibold text-emerald-400 flex flex-col items-center justify-center gap-1 active:scale-95 transition-all">
           <span class="text-base">📥</span> Export CSV
         </button>
-        <button id="openDefaultsModalBtn" class="py-2.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-semibold text-blue-400 flex flex-col items-center justify-center gap-1">
+        <button id="openDefaultsModalBtn" class="py-2.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-semibold text-blue-400 flex flex-col items-center justify-center gap-1 active:scale-95 transition-all">
           <span class="text-base">⚙️</span> New Defaults
         </button>
-        <button id="openSubBroadcastBtn" class="py-2.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-semibold text-amber-400 flex flex-col items-center justify-center gap-1">
+        <button id="openSubBroadcastBtn" class="py-2.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-semibold text-amber-400 flex flex-col items-center justify-center gap-1 active:scale-95 transition-all">
           <span class="text-base">📣</span> Sub Broadcast
         </button>
       </div>
@@ -347,7 +352,7 @@
         </button>
       </div>
 
-      <!-- Master Admin Directory (With Audit & Inspect Option) -->
+      <!-- Master Admin Directory -->
       <div class="space-y-2">
         <div class="flex items-center justify-between">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Admins Directory</h3>
@@ -356,7 +361,7 @@
         <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800 max-h-64 overflow-y-auto" id="masterAdminList"></div>
       </div>
 
-      <!-- Master Channel Network (With Direct Links & Status Toggle) -->
+      <!-- Master Channel Network -->
       <div class="space-y-2">
         <div class="flex items-center justify-between">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Channels Directory</h3>
@@ -466,8 +471,8 @@
         <div>
           <label class="block text-[11px] font-medium text-slate-400 mb-1">Target Audience Segment</label>
           <select id="broadTargetType" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500">
-            <option value="all">🌍 All Network Subscribers (Global)</option>
-            <option value="channel">🎯 Specific Channel Subscribers Only</option>
+            <option value="all">🌍 All Network Subscribers (Global Vault)</option>
+            <option value="channel">🎯 Specific Channel Audience Only</option>
           </select>
         </div>
 
@@ -619,9 +624,52 @@
       };
     }
 
+    async function loadChannels(selectedChatId = null) {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/channels/${user.id}?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: authHeaders()
+        });
+        const data = await res.json();
+
+        if (data.success && data.channels.length > 0) {
+          myChannels = data.channels;
+          channelSelect.innerHTML = myChannels.map(c => `<option value="${c.chat_id}">${c.chat_title}</option>`).join("");
+          channelForm.classList.remove("hidden");
+          noChannels.classList.add("hidden");
+          
+          const targetId = selectedChatId || (currentChannel ? currentChannel.chat_id : myChannels[0].chat_id);
+          channelSelect.value = targetId;
+          selectChannel(targetId);
+        } else {
+          channelForm.classList.add("hidden");
+          noChannels.classList.remove("hidden");
+        }
+      } catch (err) {
+        console.error("Failed to load channels:", err);
+      }
+    }
+
+    window.refreshChannelsList = async function() {
+      const btn = document.getElementById("refreshChannelsBtn");
+      if (btn) btn.innerText = "⏳ Loading...";
+      await loadChannels();
+      if (isOwner) await loadOwnerDashboard();
+      if (btn) btn.innerText = "🔄 Refresh List";
+      tg?.HapticFeedback?.notificationOccurred("success");
+    };
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        loadChannels();
+        if (isOwner) loadOwnerDashboard();
+      }
+    });
+
     async function init() {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/channels/${user.id}`, {
+        const res = await fetch(`${BACKEND_URL}/api/channels/${user.id}?t=${Date.now()}`, {
+          cache: "no-store",
           headers: authHeaders()
         });
         const data = await res.json();
@@ -638,11 +686,11 @@
         } else {
           isOwner = false;
           roleBadge.innerText = user.first_name || "Admin";
-          ownerNav.remove();
-          ownerSection.remove();
-          adminInspectModal.remove();
-          defaultsModal.remove();
-          subBroadcastModal.remove();
+          ownerNav?.remove();
+          ownerSection?.remove();
+          adminInspectModal?.remove();
+          defaultsModal?.remove();
+          subBroadcastModal?.remove();
         }
 
         if (data.success && data.channels.length > 0) {
@@ -845,7 +893,8 @@
     async function loadAnalytics(chatId) {
       analyticsList.innerHTML = `<p class="text-slate-500 text-[11px]">Loading conversion data...</p>`;
       try {
-        const res = await fetch(`${BACKEND_URL}/api/channel/analytics/${chatId}`, {
+        const res = await fetch(`${BACKEND_URL}/api/channel/analytics/${chatId}?t=${Date.now()}`, {
+          cache: "no-store",
           headers: authHeaders()
         });
         const data = await res.json();
@@ -923,7 +972,8 @@
     async function loadOwnerDashboard() {
       if (!isOwner) return;
       try {
-        const res = await fetch(`${BACKEND_URL}/api/owner/data/${user.id}`, {
+        const res = await fetch(`${BACKEND_URL}/api/owner/data/${user.id}?t=${Date.now()}`, {
+          cache: "no-store",
           headers: authHeaders()
         });
         const data = await res.json();
@@ -936,7 +986,10 @@
         allOwnerChannels = data.channels || [];
         channelCountLabel.innerText = `${allOwnerChannels.length} Channels`;
 
-        broadChannelSelect.innerHTML = allOwnerChannels.map(c => `<option value="${c.chat_id}">${c.chat_title} (${c.chat_id})</option>`).join("");
+        // Populate broadChannelSelect with real-time reachable subscriber counts
+        broadChannelSelect.innerHTML = allOwnerChannels.map(c => `
+          <option value="${c.chat_id}">${c.chat_title} (${c.subscriber_count || 0} reachable subscribers)</option>
+        `).join("");
 
         promoSlots = data.promo_slots || [];
         promoSlotsContainer.innerHTML = promoSlots.map(slot => `
@@ -960,7 +1013,7 @@
             <div class="truncate">
               <p class="font-semibold text-white truncate">${ch.chat_title}</p>
               <p class="text-[10px] text-slate-400">
-                24h: <span class="text-blue-400">+${ch.joins_24h || 0}</span> • 30d: <span class="text-emerald-400">${ch.joins_30d || 0}</span> • 90d: <span class="text-amber-400">${ch.joins_90d || 0}</span>
+                24h: <span class="text-blue-400">+${ch.joins_24h || 0}</span> • 30d: <span class="text-emerald-400">${ch.joins_30d || 0}</span> • Subs: <span class="text-amber-400 font-medium">${ch.subscriber_count || 0}</span>
               </p>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
@@ -983,7 +1036,8 @@
 
     async function loadOwnerAdmins() {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/owner/admins/${user.id}`, {
+        const res = await fetch(`${BACKEND_URL}/api/owner/admins/${user.id}?t=${Date.now()}`, {
+          cache: "no-store",
           headers: authHeaders()
         });
         const data = await res.json();
@@ -1019,7 +1073,8 @@
       adminInspectModal.classList.remove("hidden");
 
       try {
-        const res = await fetch(`${BACKEND_URL}/api/owner/admin-detail/${user.id}/${targetAdminId}`, {
+        const res = await fetch(`${BACKEND_URL}/api/owner/admin-detail/${user.id}/${targetAdminId}?t=${Date.now()}`, {
+          cache: "no-store",
           headers: authHeaders()
         });
         const data = await res.json();
@@ -1033,7 +1088,7 @@
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
               <div>
                 <p class="text-xs font-bold text-white">${ch.chat_title}</p>
-                <p class="text-[10px] text-slate-400">ID: ${ch.chat_id} • 24h: <span class="text-blue-400">+${ch.joins_24h || 0}</span> • 30d: <span class="text-emerald-400">${ch.joins_30d || 0}</span> • 90d: <span class="text-amber-400">${ch.joins_90d || 0}</span></p>
+                <p class="text-[10px] text-slate-400">ID: ${ch.chat_id} • 24h: <span class="text-blue-400">+${ch.joins_24h || 0}</span> • Subs: ${ch.subscriber_count || 0}</p>
               </div>
               <a href="${ch.custom_btn_url || 'https://t.me'}" target="_blank" class="text-[10px] px-2.5 py-1 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold">
                 🔗 Check Channel
@@ -1101,25 +1156,25 @@
       }
     };
 
+    // DIRECT TELEGRAM DM CSV EXPORT
     exportCsvBtn.addEventListener("click", async () => {
       exportCsvBtn.disabled = true;
-      exportCsvBtn.innerHTML = `<span class="text-xs">Preparing CSV...</span>`;
+      exportCsvBtn.innerHTML = `<span class="text-xs">Dispatching...</span>`;
 
       try {
-        const res = await fetch(`${BACKEND_URL}/api/owner/export-subscribers-csv/${user.id}`, {
+        const res = await fetch(`${BACKEND_URL}/api/owner/export-subscribers-csv/${user.id}?t=${Date.now()}`, {
+          cache: "no-store",
           headers: authHeaders()
         });
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `audience_vault_${Date.now()}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        tg?.HapticFeedback?.notificationOccurred("success");
+        const result = await res.json();
+        if (result.success) {
+          tg?.HapticFeedback?.notificationOccurred("success");
+          alert(`📁 ${result.message}\n(${result.count} unique subscribers)`);
+        } else {
+          alert("CSV export failed: " + (result.detail || ""));
+        }
       } catch (err) {
-        alert("CSV download failed.");
+        alert("Failed to trigger CSV delivery. Check server status.");
       } finally {
         exportCsvBtn.disabled = false;
         exportCsvBtn.innerHTML = `<span class="text-base">📥</span> Export CSV`;
@@ -1129,7 +1184,10 @@
     openDefaultsModalBtn.addEventListener("click", async () => {
       defaultsModal.classList.remove("hidden");
       try {
-        const res = await fetch(`${BACKEND_URL}/api/owner/defaults/${user.id}`, { headers: authHeaders() });
+        const res = await fetch(`${BACKEND_URL}/api/owner/defaults/${user.id}?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: authHeaders()
+        });
         const data = await res.json();
         if (data.success && data.defaults) {
           defCustomMsg.value = data.defaults.custom_message || "";
@@ -1224,7 +1282,7 @@
           broadBtnUrl.value = "";
           closeSubBroadcastModal();
         } else {
-          alert("Broadcast failed: " + (result.error || ""));
+          alert("Broadcast failed: " + (result.error || result.detail || ""));
         }
       } catch (e) {
         alert("Broadcast communication error.");
@@ -1257,7 +1315,8 @@
 
     async function loadPendingMigrations() {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/owner/migrations/${user.id}`, {
+        const res = await fetch(`${BACKEND_URL}/api/owner/migrations/${user.id}?t=${Date.now()}`, {
+          cache: "no-store",
           headers: authHeaders()
         });
         const data = await res.json();
