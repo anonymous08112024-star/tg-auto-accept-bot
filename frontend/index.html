@@ -14,7 +14,7 @@
     }
   </style>
 </head>
-<body class="p-4 pb-20 max-w-lg mx-auto">
+<body class="p-4 pb-24 max-w-lg mx-auto">
 
   <!-- ========================================== -->
   <!-- LOCKED STATE (OUTSIDE TELEGRAM BROWSER)    -->
@@ -31,7 +31,7 @@
     </div>
     <div class="pt-2">
       <div class="inline-block bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-[11px] text-slate-300">
-        Open <b class="text-blue-400">@AutoRequestAcceptorxBot</b> and send <code class="bg-slate-800 px-1.5 py-0.5 rounded text-amber-300">/settings</code>
+        Open <b class="text-blue-400">@AutoRequestAcceptorxBot</b> and tap <code class="bg-slate-800 px-1.5 py-0.5 rounded text-amber-300">⚡ Dashboard</code>
       </div>
     </div>
   </div>
@@ -86,31 +86,51 @@
 
       <div id="channelForm" class="space-y-5 hidden">
         
-        <!-- Channel Selector & Banner Status -->
+        <!-- Target Channel Selector -->
         <div class="space-y-2">
           <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Target Channel</label>
           <select id="channelSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
           </select>
-          
-          <!-- Banner Status Bar -->
-          <div class="flex items-center justify-between bg-slate-900/70 border border-slate-800 px-3.5 py-2.5 rounded-xl text-xs">
-            <div class="flex items-center gap-2">
-              <span id="bannerIndicator" class="h-2 w-2 rounded-full bg-slate-600"></span>
-              <span id="bannerStatusText" class="text-slate-300">Banner: Text-only</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <button id="setBannerBtn" class="text-[11px] font-semibold text-blue-400 hover:text-blue-300 transition-colors">
-                📸 Set Photo
-              </button>
-              <span class="text-slate-700">|</span>
-              <button id="removeBannerBtn" class="text-[11px] font-semibold text-rose-400 hover:text-rose-300 transition-colors">
-                Remove
-              </button>
-            </div>
+        </div>
+
+        <!-- Channel Horizon Metrics Matrix -->
+        <div class="grid grid-cols-4 gap-2 bg-slate-900/70 border border-slate-800 p-3 rounded-2xl text-center">
+          <div>
+            <p class="text-[10px] text-slate-400">Last 24h</p>
+            <p class="text-sm font-bold text-blue-400 mt-0.5" id="cJoins24h">0</p>
+          </div>
+          <div>
+            <p class="text-[10px] text-slate-400">30 Days</p>
+            <p class="text-sm font-bold text-emerald-400 mt-0.5" id="cJoins30d">0</p>
+          </div>
+          <div>
+            <p class="text-[10px] text-slate-400">90 Days</p>
+            <p class="text-sm font-bold text-amber-400 mt-0.5" id="cJoins90d">0</p>
+          </div>
+          <div>
+            <p class="text-[10px] text-slate-400">All-Time</p>
+            <p class="text-sm font-bold text-white mt-0.5" id="cJoinsAll">0</p>
           </div>
         </div>
 
-        <!-- Live Mobile DM Preview -->
+        <!-- Banner Status Bar -->
+        <div class="flex items-center justify-between bg-slate-900/70 border border-slate-800 px-3.5 py-2.5 rounded-xl text-xs">
+          <div class="flex items-center gap-2">
+            <span id="bannerIndicator" class="h-2 w-2 rounded-full bg-slate-600"></span>
+            <span id="bannerStatusText" class="text-slate-300">Banner: Text-only</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="setBannerBtn" class="text-[11px] font-semibold text-blue-400 hover:text-blue-300 transition-colors">
+              📸 Set Photo
+            </button>
+            <span class="text-slate-700">|</span>
+            <button id="removeBannerBtn" class="text-[11px] font-semibold text-rose-400 hover:text-rose-300 transition-colors">
+              Remove
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Subscriber DM Preview -->
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Subscriber DM Preview</label>
           <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 shadow-xl">
@@ -191,7 +211,7 @@
 
           <div id="eventMessageContainer" class="hidden pt-2 border-t border-slate-800 space-y-1.5">
             <label class="block text-[11px] font-medium text-amber-400">Event Message Copy</label>
-            <textarea id="eventMessage" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="🚨 MATCH DAY SPECIAL: Predictions are live! Tap below to open today's card."></textarea>
+            <textarea id="eventMessage" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="🚨 MATCH DAY SPECIAL: Live predictions available now!"></textarea>
           </div>
         </div>
 
@@ -271,7 +291,7 @@
     <!-- ========================================== -->
     <div id="ownerSection" class="hidden space-y-6">
       
-      <!-- Telemetry Cards -->
+      <!-- Precision Horizon Telemetry Matrix -->
       <div class="grid grid-cols-2 gap-3">
         <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
           <p class="text-[11px] font-medium text-slate-400">Total Network Joins</p>
@@ -284,15 +304,28 @@
           <span class="text-[10px] text-blue-300 font-medium">Daily velocity</span>
         </div>
         <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
-          <p class="text-[11px] font-medium text-slate-400">Channels</p>
-          <p class="text-xl font-bold text-white mt-1" id="mTotalChannels">0</p>
-          <span class="text-[10px] text-slate-400" id="mActiveChannels">0 active</span>
+          <p class="text-[11px] font-medium text-slate-400">30-Day Joins</p>
+          <p class="text-xl font-bold text-emerald-400 mt-1" id="m30dJoins">0</p>
+          <span class="text-[10px] text-slate-400">Monthly volume</span>
         </div>
         <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl">
-          <p class="text-[11px] font-medium text-slate-400">Active Promo Slots</p>
-          <p class="text-xl font-bold text-amber-400 mt-1" id="mActiveSlotsCount">1 / 3</p>
-          <span class="text-[10px] text-amber-300 font-medium">Rotated in subscriber DMs</span>
+          <p class="text-[11px] font-medium text-slate-400">90-Day Joins</p>
+          <p class="text-xl font-bold text-amber-400 mt-1" id="m90dJoins">0</p>
+          <span class="text-[10px] text-slate-400">Quarterly reach</span>
         </div>
+      </div>
+
+      <!-- Quick Action Controls: CSV Export, Defaults, Subscriber Broadcast -->
+      <div class="grid grid-cols-3 gap-2">
+        <button id="exportCsvBtn" class="py-2.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-semibold text-emerald-400 flex flex-col items-center justify-center gap-1">
+          <span class="text-base">📥</span> Export CSV
+        </button>
+        <button id="openDefaultsModalBtn" class="py-2.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-semibold text-blue-400 flex flex-col items-center justify-center gap-1">
+          <span class="text-base">⚙️</span> New Defaults
+        </button>
+        <button id="openSubBroadcastBtn" class="py-2.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-semibold text-amber-400 flex flex-col items-center justify-center gap-1">
+          <span class="text-base">📣</span> Sub Broadcast
+        </button>
       </div>
 
       <!-- Audience Vault Review Queue -->
@@ -323,39 +356,156 @@
         </button>
       </div>
 
-      <!-- Master Admin Directory -->
+      <!-- Master Admin Directory (With Audit & Inspect Option) -->
       <div class="space-y-2">
         <div class="flex items-center justify-between">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Admins Directory</h3>
           <span class="text-[11px] text-slate-500" id="adminCountLabel">0 Admins</span>
         </div>
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800 max-h-56 overflow-y-auto" id="masterAdminList"></div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800 max-h-64 overflow-y-auto" id="masterAdminList"></div>
       </div>
 
-      <!-- Master Channel Network -->
+      <!-- Master Channel Network (With Direct Links & Status Toggle) -->
       <div class="space-y-2">
         <div class="flex items-center justify-between">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Channels Directory</h3>
           <span class="text-[11px] text-slate-500" id="channelCountLabel">0 Channels</span>
         </div>
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800 max-h-56 overflow-y-auto" id="masterChannelList"></div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800 max-h-64 overflow-y-auto" id="masterChannelList"></div>
       </div>
 
-      <!-- Network Broadcast Engine -->
+      <!-- Network Admin Broadcast Engine -->
       <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3">
         <div class="flex items-center gap-2">
           <span class="text-base">📢</span>
           <div>
-            <h3 class="text-xs font-semibold text-white">Broadcast Announcement</h3>
-            <p class="text-[10px] text-slate-400">Dispatches private notification to all connected channel admins</p>
+            <h3 class="text-xs font-semibold text-white">Broadcast Announcement to Admins</h3>
+            <p class="text-[10px] text-slate-400">Dispatches notification to all connected channel admins</p>
           </div>
         </div>
-        <textarea id="broadcastInput" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="Type administrative announcement or update..."></textarea>
+        <textarea id="broadcastInput" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="Type administrative announcement or update..."></textarea>
         <button id="sendBroadcastBtn" class="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
-          Dispatch Broadcast
+          Dispatch Admin Broadcast
         </button>
       </div>
 
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL 1: OWNER ADMIN INSPECTION & OVERRIDE -->
+  <!-- ========================================== -->
+  <div id="adminInspectModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+            <span>🔍</span> Admin Channels & Moderation Audit
+          </h3>
+          <p class="text-[11px] text-slate-400" id="inspectAdminTitle">Admin ID: ...</p>
+        </div>
+        <button onclick="closeInspectModal()" class="text-slate-400 hover:text-white text-lg font-bold px-2">✕</button>
+      </div>
+
+      <div id="inspectChannelsList" class="space-y-4 max-h-[70vh] overflow-y-auto pr-1"></div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL 2: DYNAMIC NEW CHANNEL DEFAULTS      -->
+  <!-- ========================================== -->
+  <div id="defaultsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-sm font-bold text-white">⚙️ Global New Channel Defaults</h3>
+          <p class="text-[11px] text-slate-400">Settings applied automatically to all newly added channels</p>
+        </div>
+        <button onclick="closeDefaultsModal()" class="text-slate-400 hover:text-white text-lg font-bold px-2">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Default Welcome Message</label>
+          <textarea id="defCustomMsg" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] font-medium text-slate-400 mb-1">Button 1 Title</label>
+            <input type="text" id="defBtn1Text" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-slate-400 mb-1">Button 1 Fallback URL</label>
+            <input type="url" id="defBtn1Url" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500" placeholder="https://t.me">
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+          <span>Anti-Bot Shield Enabled by Default</span>
+          <input type="checkbox" id="defAntiBot" class="accent-emerald-500">
+        </div>
+
+        <div class="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+          <span>Silent DM Delivery by Default</span>
+          <input type="checkbox" id="defSilentDm" class="accent-blue-500">
+        </div>
+
+        <button id="saveDefaultsBtn" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all">
+          Save Global Defaults
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL 3: SEGMENTED SUBSCRIBER BROADCAST    -->
+  <!-- ========================================== -->
+  <div id="subBroadcastModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-sm font-bold text-white">📣 Segmented Subscriber Broadcast</h3>
+          <p class="text-[10px] text-slate-400">Deliver announcements via FloodGuard directly to subscribers</p>
+        </div>
+        <button onclick="closeSubBroadcastModal()" class="text-slate-400 hover:text-white text-lg font-bold px-2">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Target Audience Segment</label>
+          <select id="broadTargetType" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500">
+            <option value="all">🌍 All Network Subscribers (Global)</option>
+            <option value="channel">🎯 Specific Channel Subscribers Only</option>
+          </select>
+        </div>
+
+        <div id="broadChannelSelectContainer" class="hidden">
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Select Channel Audience</label>
+          <select id="broadChannelSelect" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500">
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Announcement Message (HTML Supported)</label>
+          <textarea id="broadMessageInput" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500" placeholder="Type message to broadcast to subscribers..."></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] font-medium text-slate-400 mb-1">Button Title (Optional)</label>
+            <input type="text" id="broadBtnText" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500" placeholder="e.g. Open Link">
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-slate-400 mb-1">Button URL (Optional)</label>
+            <input type="url" id="broadBtnUrl" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500" placeholder="https://...">
+          </div>
+        </div>
+
+        <button id="dispatchSubBroadcastBtn" class="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs transition-all">
+          Enqueue Broadcast via FloodGuard
+        </button>
+      </div>
     </div>
   </div>
 
@@ -378,7 +528,7 @@
     // Guard: Block execution if opened outside Telegram TMA
     if (!user || !user.id || !rawInitData) {
       unauthorizedScreen.classList.remove("hidden");
-      appContainer.remove(); // Completely destroy the DOM nodes for security
+      appContainer.remove();
       throw new Error("Execution halted: Not inside authorized Telegram WebApp.");
     } else {
       appContainer.classList.remove("hidden");
@@ -401,6 +551,11 @@
     const bannerStatusText = document.getElementById("bannerStatusText");
     const setBannerBtn = document.getElementById("setBannerBtn");
     const removeBannerBtn = document.getElementById("removeBannerBtn");
+
+    const cJoins24h = document.getElementById("cJoins24h");
+    const cJoins30d = document.getElementById("cJoins30d");
+    const cJoins90d = document.getElementById("cJoins90d");
+    const cJoinsAll = document.getElementById("cJoinsAll");
 
     const customMessage = document.getElementById("customMessage");
     const btn1Text = document.getElementById("btn1Text");
@@ -430,9 +585,8 @@
     // Owner Elements
     const mTotalJoins = document.getElementById("mTotalJoins");
     const m24hJoins = document.getElementById("m24hJoins");
-    const mTotalChannels = document.getElementById("mTotalChannels");
-    const mActiveChannels = document.getElementById("mActiveChannels");
-    const mActiveSlotsCount = document.getElementById("mActiveSlotsCount");
+    const m30dJoins = document.getElementById("m30dJoins");
+    const m90dJoins = document.getElementById("m90dJoins");
     const promoSlotsContainer = document.getElementById("promoSlotsContainer");
     const savePromoSlotsBtn = document.getElementById("savePromoSlotsBtn");
     const pendingMigrationsCard = document.getElementById("pendingMigrationsCard");
@@ -444,12 +598,38 @@
     const broadcastInput = document.getElementById("broadcastInput");
     const sendBroadcastBtn = document.getElementById("sendBroadcastBtn");
 
+    const exportCsvBtn = document.getElementById("exportCsvBtn");
+    const openDefaultsModalBtn = document.getElementById("openDefaultsModalBtn");
+    const openSubBroadcastBtn = document.getElementById("openSubBroadcastBtn");
+
+    // Modals
+    const adminInspectModal = document.getElementById("adminInspectModal");
+    const inspectAdminTitle = document.getElementById("inspectAdminTitle");
+    const inspectChannelsList = document.getElementById("inspectChannelsList");
+
+    const defaultsModal = document.getElementById("defaultsModal");
+    const defCustomMsg = document.getElementById("defCustomMsg");
+    const defBtn1Text = document.getElementById("defBtn1Text");
+    const defBtn1Url = document.getElementById("defBtn1Url");
+    const defAntiBot = document.getElementById("defAntiBot");
+    const defSilentDm = document.getElementById("defSilentDm");
+    const saveDefaultsBtn = document.getElementById("saveDefaultsBtn");
+
+    const subBroadcastModal = document.getElementById("subBroadcastModal");
+    const broadTargetType = document.getElementById("broadTargetType");
+    const broadChannelSelectContainer = document.getElementById("broadChannelSelectContainer");
+    const broadChannelSelect = document.getElementById("broadChannelSelect");
+    const broadMessageInput = document.getElementById("broadMessageInput");
+    const broadBtnText = document.getElementById("broadBtnText");
+    const broadBtnUrl = document.getElementById("broadBtnUrl");
+    const dispatchSubBroadcastBtn = document.getElementById("dispatchSubBroadcastBtn");
+
     let isOwner = false;
     let myChannels = [];
     let currentChannel = null;
     let promoSlots = [];
+    let allOwnerChannels = [];
 
-    // Helper for secure authenticated requests
     function authHeaders() {
       return {
         "Content-Type": "application/json",
@@ -477,8 +657,11 @@
         } else {
           isOwner = false;
           roleBadge.innerText = user.first_name || "Admin";
-          ownerNav.remove(); // Remove HQ button completely from regular admins
-          ownerSection.remove(); // Remove HQ section completely from DOM
+          ownerNav.remove();
+          ownerSection.remove();
+          adminInspectModal.remove();
+          defaultsModal.remove();
+          subBroadcastModal.remove();
         }
 
         if (data.success && data.channels.length > 0) {
@@ -497,6 +680,11 @@
     function selectChannel(chatId) {
       currentChannel = myChannels.find(c => String(c.chat_id) === String(chatId));
       if (!currentChannel) return;
+
+      cJoins24h.innerText = "+" + (currentChannel.joins_24h || 0);
+      cJoins30d.innerText = currentChannel.joins_30d || 0;
+      cJoins90d.innerText = currentChannel.joins_90d || 0;
+      cJoinsAll.innerText = currentChannel.total_joins || 0;
 
       customMessage.value = currentChannel.custom_message || "Welcome to {channel}! Your request has been approved.";
       btn1Text.value = currentChannel.custom_btn_text || `📢 ${currentChannel.chat_title}`;
@@ -754,7 +942,7 @@
       ownerSection.classList.remove("hidden");
     });
 
-    // Owner HQ Loader (Guarded)
+    // Owner HQ Loader
     async function loadOwnerDashboard() {
       if (!isOwner) return;
       try {
@@ -766,14 +954,16 @@
 
         mTotalJoins.innerText = (data.metrics.total_joins || 0).toLocaleString();
         m24hJoins.innerText = "+" + (data.metrics.joins_24h || 0).toLocaleString();
-        mTotalChannels.innerText = data.metrics.total_channels || 0;
-        mActiveChannels.innerText = `${data.metrics.active_channels || 0} active`;
+        m30dJoins.innerText = (data.metrics.joins_30d || 0).toLocaleString();
+        m90dJoins.innerText = (data.metrics.joins_90d || 0).toLocaleString();
+
+        allOwnerChannels = data.channels || [];
+        channelCountLabel.innerText = `${allOwnerChannels.length} Channels`;
+
+        // Populate broadChannelSelect options
+        broadChannelSelect.innerHTML = allOwnerChannels.map(c => `<option value="${c.chat_id}">${c.chat_title} (${c.chat_id})</option>`).join("");
 
         promoSlots = data.promo_slots || [];
-        const activeCount = promoSlots.filter(s => s.is_active).length;
-        mActiveSlotsCount.innerText = `${activeCount} / ${promoSlots.length}`;
-        channelCountLabel.innerText = `${data.channels.length} Channels`;
-
         promoSlotsContainer.innerHTML = promoSlots.map(slot => `
           <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2">
             <div class="flex items-center justify-between">
@@ -790,15 +980,22 @@
           </div>
         `).join("");
 
-        masterChannelList.innerHTML = data.channels.map(ch => `
+        masterChannelList.innerHTML = allOwnerChannels.map(ch => `
           <div class="p-3 flex items-center justify-between gap-3 text-xs">
             <div class="truncate">
               <p class="font-semibold text-white truncate">${ch.chat_title}</p>
-              <p class="text-[10px] text-slate-400">ID: ${ch.chat_id} • Joins: <span class="text-blue-400 font-medium">${ch.total_joins}</span></p>
+              <p class="text-[10px] text-slate-400">
+                24h: <span class="text-blue-400">+${ch.joins_24h}</span> • 30d: <span class="text-emerald-400">${ch.joins_30d}</span> • Total: <span class="text-slate-300 font-medium">${ch.total_joins}</span>
+              </p>
             </div>
-            <button onclick="toggleChannel(${ch.chat_id}, ${!ch.is_active})" class="shrink-0 text-[10px] px-2.5 py-1 rounded-lg font-medium border ${ch.is_active ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' : 'border-rose-500/30 text-rose-400 bg-rose-500/10'}">
-              ${ch.is_active ? 'Active' : 'Paused'}
-            </button>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <a href="${ch.custom_btn_url || 'https://t.me'}" target="_blank" class="text-[10px] px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-blue-400 font-medium">
+                Link
+              </a>
+              <button onclick="toggleChannel(${ch.chat_id}, ${!ch.is_active})" class="text-[10px] px-2 py-1 rounded-lg font-medium border ${ch.is_active ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' : 'border-rose-500/30 text-rose-400 bg-rose-500/10'}">
+                ${ch.is_active ? 'Active' : 'Paused'}
+              </button>
+            </div>
           </div>
         `).join("");
 
@@ -821,18 +1018,250 @@
         masterAdminList.innerHTML = data.admins.map(admin => `
           <div class="p-3 flex items-center justify-between gap-3 text-xs">
             <div class="truncate">
-              <p class="font-semibold text-white truncate">${admin.name} ${admin.username ? `<span class="text-slate-400 text-[10px] font-normal">${admin.username}</span>` : ''}</p>
-              <p class="text-[10px] text-slate-400">${admin.channels_count} Channels • <span class="text-blue-400 font-medium">${admin.total_joins} joins</span></p>
+              <p class="font-semibold text-white truncate">${admin.username} <span class="text-slate-500 text-[10px]">(${admin.admin_id})</span></p>
+              <p class="text-[10px] text-slate-400">
+                ${admin.channels_count} Ch • 24h: <span class="text-blue-400">+${admin.joins_24h}</span> • 30d: <span class="text-emerald-400">${admin.joins_30d}</span> • Total: <span class="text-slate-300">${admin.total_joins}</span>
+              </p>
             </div>
-            <button onclick="directMessageAdmin(${admin.admin_id})" class="shrink-0 text-[10px] px-2.5 py-1 rounded-lg font-medium bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white transition-all">
-              Direct DM
-            </button>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button onclick="inspectAdmin(${admin.admin_id})" class="text-[10px] px-2.5 py-1 rounded-lg font-medium bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white transition-all">
+                🔍 Inspect
+              </button>
+              <button onclick="directMessageAdmin(${admin.admin_id})" class="text-[10px] px-2 py-1 rounded-lg font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700">
+                DM
+              </button>
+            </div>
           </div>
         `).join("");
       } catch (e) {
         console.error("Admins load error:", e);
       }
     }
+
+    // Owner Inspection Modal
+    window.inspectAdmin = async function(targetAdminId) {
+      inspectAdminTitle.innerText = `Admin ID: ${targetAdminId}`;
+      inspectChannelsList.innerHTML = `<p class="text-slate-500 text-xs">Loading admin channel records...</p>`;
+      adminInspectModal.classList.remove("hidden");
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/admin-detail/${user.id}/${targetAdminId}`, {
+          headers: authHeaders()
+        });
+        const data = await res.json();
+        if (!data.success || data.channels.length === 0) {
+          inspectChannelsList.innerHTML = `<p class="text-slate-500 text-xs">No channels connected for this admin.</p>`;
+          return;
+        }
+
+        inspectChannelsList.innerHTML = data.channels.map(ch => `
+          <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+              <div>
+                <p class="text-xs font-bold text-white">${ch.chat_title}</p>
+                <p class="text-[10px] text-slate-400">ID: ${ch.chat_id} • 24h: <span class="text-blue-400">+${ch.joins_24h}</span> • Total: ${ch.total_joins}</p>
+              </div>
+              <a href="${ch.custom_btn_url || 'https://t.me'}" target="_blank" class="text-[10px] px-2.5 py-1 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold">
+                🔗 Check Channel
+              </a>
+            </div>
+
+            <div class="space-y-1.5">
+              <label class="block text-[10px] font-medium text-slate-400">Welcome DM Text (Sanitize if inappropriate)</label>
+              <textarea id="ovMsg_${ch.chat_id}" rows="2" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-500">${ch.custom_message || ''}</textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[10px] font-medium text-slate-400">Button 1 Title</label>
+                <input type="text" id="ovBtn1Text_${ch.chat_id}" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white" value="${ch.custom_btn_text || ''}">
+              </div>
+              <div>
+                <label class="block text-[10px] font-medium text-slate-400">Button 1 URL</label>
+                <input type="url" id="ovBtn1Url_${ch.chat_id}" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white" value="${ch.custom_btn_url || ''}">
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1">
+              <label class="text-[11px] text-slate-300 flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" id="ovActive_${ch.chat_id}" class="accent-emerald-500" ${ch.is_active ? 'checked' : ''}>
+                <span>Channel Active</span>
+              </label>
+              <button onclick="saveChannelOverride(${ch.chat_id})" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg text-[11px] shadow-sm">
+                Save & Override
+              </button>
+            </div>
+          </div>
+        `).join("");
+      } catch (err) {
+        inspectChannelsList.innerHTML = `<p class="text-rose-400 text-xs">Failed to load channels.</p>`;
+      }
+    };
+
+    window.closeInspectModal = () => adminInspectModal.classList.add("hidden");
+
+    window.saveChannelOverride = async function(chatId) {
+      const payload = {
+        admin_id: user.id,
+        target_chat_id: chatId,
+        custom_message: document.getElementById(`ovMsg_${chatId}`).value.trim(),
+        custom_btn_text: document.getElementById(`ovBtn1Text_${chatId}`).value.trim(),
+        custom_btn_url: document.getElementById(`ovBtn1Url_${chatId}`).value.trim(),
+        is_active: document.getElementById(`ovActive_${chatId}`).checked
+      };
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/channel/override`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (result.success) {
+          alert("Channel configuration sanitized and overridden successfully!");
+        } else {
+          alert("Error: " + (result.error || ""));
+        }
+      } catch (e) {
+        alert("Failed to override channel.");
+      }
+    };
+
+    // CSV Audience Export
+    exportCsvBtn.addEventListener("click", async () => {
+      exportCsvBtn.disabled = true;
+      exportCsvBtn.innerHTML = `<span class="text-xs">Preparing CSV...</span>`;
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/export-subscribers-csv/${user.id}`, {
+          headers: authHeaders()
+        });
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `audience_vault_${Date.now()}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        tg?.HapticFeedback?.notificationOccurred("success");
+      } catch (err) {
+        alert("CSV download failed.");
+      } finally {
+        exportCsvBtn.disabled = false;
+        exportCsvBtn.innerHTML = `<span class="text-base">📥</span> Export CSV`;
+      }
+    });
+
+    // Defaults Modal
+    openDefaultsModalBtn.addEventListener("click", async () => {
+      defaultsModal.classList.remove("hidden");
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/defaults/${user.id}`, { headers: authHeaders() });
+        const data = await res.json();
+        if (data.success && data.defaults) {
+          defCustomMsg.value = data.defaults.custom_message || "";
+          defBtn1Text.value = data.defaults.custom_btn_text || "";
+          defBtn1Url.value = data.defaults.custom_btn_url || "";
+          defAntiBot.checked = !!data.defaults.anti_bot_enabled;
+          defSilentDm.checked = !!data.defaults.silent_dm;
+        }
+      } catch (e) {
+        console.error("Defaults load error:", e);
+      }
+    });
+
+    window.closeDefaultsModal = () => defaultsModal.classList.add("hidden");
+
+    saveDefaultsBtn.addEventListener("click", async () => {
+      saveDefaultsBtn.disabled = true;
+      saveDefaultsBtn.innerText = "Saving defaults...";
+
+      const payload = {
+        admin_id: user.id,
+        defaults: {
+          custom_message: defCustomMsg.value.trim(),
+          custom_btn_text: defBtn1Text.value.trim(),
+          custom_btn_url: defBtn1Url.value.trim(),
+          anti_bot_enabled: defAntiBot.checked,
+          silent_dm: defSilentDm.checked
+        }
+      };
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/defaults`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (result.success) {
+          alert("Global new channel defaults updated! All future channels will inherit these settings.");
+          closeDefaultsModal();
+        } else {
+          alert("Error saving defaults.");
+        }
+      } catch (e) {
+        alert("Communication error.");
+      } finally {
+        saveDefaultsBtn.disabled = false;
+        saveDefaultsBtn.innerText = "Save Global Defaults";
+      }
+    });
+
+    // Segmented Broadcast Modal
+    openSubBroadcastBtn.addEventListener("click", () => subBroadcastModal.classList.remove("hidden"));
+    window.closeSubBroadcastModal = () => subBroadcastModal.classList.add("hidden");
+
+    broadTargetType.addEventListener("change", (e) => {
+      if (e.target.value === "channel") {
+        broadChannelSelectContainer.classList.remove("hidden");
+      } else {
+        broadChannelSelectContainer.classList.add("hidden");
+      }
+    });
+
+    dispatchSubBroadcastBtn.addEventListener("click", async () => {
+      const msg = broadMessageInput.value.trim();
+      if (!msg) return alert("Please enter announcement message.");
+
+      if (!confirm("Dispatch broadcast to selected subscriber segment via FloodGuard?")) return;
+
+      dispatchSubBroadcastBtn.disabled = true;
+      dispatchSubBroadcastBtn.innerText = "Enqueuing broadcast...";
+
+      const payload = {
+        admin_id: user.id,
+        message: msg,
+        button_text: broadBtnText.value.trim() || null,
+        button_url: broadBtnUrl.value.trim() || null,
+        target_type: broadTargetType.value,
+        target_chat_id: broadTargetType.value === "channel" ? Number(broadChannelSelect.value) : null
+      };
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/broadcast-subscribers`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (result.success) {
+          alert(`Broadcast enqueued for ${result.queued} subscribers! FloodGuard will deliver at 25 req/sec.`);
+          broadMessageInput.value = "";
+          broadBtnText.value = "";
+          broadBtnUrl.value = "";
+          closeSubBroadcastModal();
+        } else {
+          alert("Broadcast failed: " + (result.error || ""));
+        }
+      } catch (e) {
+        alert("Broadcast communication error.");
+      } finally {
+        dispatchSubBroadcastBtn.disabled = false;
+        dispatchSubBroadcastBtn.innerText = "Enqueue Broadcast via FloodGuard";
+      }
+    });
 
     window.directMessageAdmin = async function(targetId) {
       const msg = prompt(`Enter message to send directly to Admin (ID: ${targetId}):`);
@@ -982,7 +1411,7 @@
         alert("Broadcast communication error.");
       } finally {
         sendBroadcastBtn.disabled = false;
-        sendBroadcastBtn.innerText = "Dispatch Broadcast";
+        sendBroadcastBtn.innerText = "Dispatch Admin Broadcast";
       }
     });
 
