@@ -52,7 +52,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = FastAPI(title="God-Tier Auto-Accept Platform")
 
-# CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -61,7 +60,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global Anti-Cache Middleware: Forces WebViews to always fetch real-time data
+# Global Anti-Cache Middleware: Forces WebViews to always fetch fresh data
 @app.middleware("http")
 async def add_cache_headers(request: Request, call_next):
     response = await call_next(request)
@@ -179,7 +178,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Hello {user.first_name}! This bot provides automated, instant join-request processing "
         f"with custom branded DMs and analytics.\n\n"
         f"<b>Quick Setup:</b>\n"
-        f"1. Add @{context.bot.username} as an <b>Administrator</b> in your channel with <i>Invite Users</i> permission.\n"
+        f"1. Add @{context.bot.username} as an <b>Administrator</b> in your channel or group with <i>Invite Users</i> permission.\n"
         f"2. Generate an invite link with <b>Request Admin Approval</b> turned ON.\n"
         f"3. Use the <b>⚡ Open Dashboard</b> button below to customize your welcome cards."
     )
@@ -197,13 +196,13 @@ async def cmd_mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not channels:
         await update.message.reply_text(
-            "📊 <b>No Channels Connected</b>\n\n"
-            "You haven't added this bot to any channels yet. Promote the bot to Admin in your channel to begin.",
+            "📊 <b>No Channels or Groups Connected</b>\n\n"
+            "You haven't added this bot to any channels yet. Promote the bot to Administrator in your channel or group to begin.",
             parse_mode="HTML"
         )
         return
 
-    text = "📊 <b>Your Channel Performance:</b>\n\n"
+    text = "📊 <b>Your Channel & Group Performance:</b>\n\n"
     for ch in channels:
         h = compute_horizon_stats(ch["chat_id"])
         status = "🟢 Active" if ch.get("is_active", True) else "🔴 Paused"
@@ -251,20 +250,48 @@ async def handle_banner_photo(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Auto-registers channels and re-binds ownership dynamically upon bot promotion."""
+    """
+    Handles addition and status updates across Channels, Supergroups, and Groups.
+    Automatically resolves Anonymous Admin masking and regular member status.
+    """
     result = update.my_chat_member
     if not result:
         return
 
     chat = result.chat
-    new_status = result.new_chat_member.status
+    new_member = result.new_chat_member
+    new_status = new_member.status
     old_status = result.old_chat_member.status
-    admin_user = result.from_user
+    raw_admin_user = result.from_user
 
+    # 1. Resolve Anonymous Admins and System IDs
+    effective_admin_id = raw_admin_user.id if raw_admin_user else OWNER_ID
+    effective_username = raw_admin_user.username or "" if raw_admin_user else ""
+
+    if raw_admin_user and (raw_admin_user.is_bot or raw_admin_user.id in [1087968824, 777000]):
+        effective_admin_id = OWNER_ID
+        effective_username = "Surendra"
+
+    # Case A: Bot added to a group as a basic member (needs promotion to Administrator)
+    if new_status == "member" and old_status in ["left", "kicked"]:
+        if chat.type in ["group", "supergroup"]:
+            try:
+                await context.bot.send_message(
+                    chat_id=chat.id,
+                    text=(
+                        "👋 <b>Thanks for adding me!</b>\n\n"
+                        "To activate instant join-request approvals, please **promote this bot to Administrator** "
+                        "with the <i>Invite Users via Link</i> permission enabled."
+                    ),
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                logger.info(f"Could not send member prompt in group {chat.id}: {e}")
+        return
+
+    # Case B: Bot promoted to Administrator in Channel, Supergroup, or Group
     if new_status == "administrator":
-        existing = supabase.table("channels").select("chat_id").eq("chat_id", chat.id).execute()
         magic_link = ""
-
         try:
             invite_obj = await context.bot.create_chat_invite_link(
                 chat_id=chat.id,
@@ -273,69 +300,94 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
             )
             magic_link = invite_obj.invite_link
         except Exception as e:
-            logger.warning(f"Could not auto-generate magic link: {e}")
+            logger.warning(f"Could not auto-generate magic link for {chat.id}: {e}")
 
-        if not existing.data:
-            defaults = await get_system_channel_defaults()
-            supabase.table("channels").insert({
-                "chat_id": chat.id,
-                "chat_title": chat.title or "Untitled Channel",
-                "admin_id": admin_user.id,
-                "admin_username": admin_user.username or "",
-                "custom_message": defaults.get("custom_message"),
-                "custom_btn_text": defaults.get("custom_btn_text", "📢 Official Channel"),
-                "custom_btn_url": magic_link or defaults.get("custom_btn_url", ""),
-                "custom_btn_2_text": defaults.get("custom_btn_2_text", ""),
-                "custom_btn_2_url": defaults.get("custom_btn_2_url", ""),
-                "silent_dm": defaults.get("silent_dm", False),
-                "anti_bot_enabled": defaults.get("anti_bot_enabled", True),
-                "event_mode_enabled": defaults.get("event_mode_enabled", False),
-                "event_message": defaults.get("event_message", ""),
-                "is_active": True
-            }).execute()
-        else:
-            update_data = {
-                "is_active": True,
-                "chat_title": chat.title or "Untitled Channel",
-                "admin_id": admin_user.id,
-                "admin_username": admin_user.username or ""
-            }
-            if magic_link:
-                update_data["custom_btn_url"] = magic_link
-            supabase.table("channels").update(update_data).eq("chat_id", chat.id).execute()
+        # Check existing database entry
+        try:
+            existing = supabase.table("channels").select("chat_id").eq("chat_id", chat.id).execute()
+            if not existing.data:
+                defaults = await get_system_channel_defaults()
+                supabase.table("channels").insert({
+                    "chat_id": chat.id,
+                    "chat_title": chat.title or "Untitled Community",
+                    "admin_id": effective_admin_id,
+                    "admin_username": effective_username,
+                    "custom_message": defaults.get("custom_message"),
+                    "custom_btn_text": defaults.get("custom_btn_text", "📢 Official Link"),
+                    "custom_btn_url": magic_link or defaults.get("custom_btn_url", ""),
+                    "custom_btn_2_text": defaults.get("custom_btn_2_text", ""),
+                    "custom_btn_2_url": defaults.get("custom_btn_2_url", ""),
+                    "silent_dm": defaults.get("silent_dm", False),
+                    "anti_bot_enabled": defaults.get("anti_bot_enabled", True),
+                    "event_mode_enabled": defaults.get("event_mode_enabled", False),
+                    "event_message": defaults.get("event_message", ""),
+                    "is_active": True
+                }).execute()
+            else:
+                update_data = {
+                    "is_active": True,
+                    "chat_title": chat.title or "Untitled Community",
+                    "admin_id": effective_admin_id,
+                    "admin_username": effective_username
+                }
+                if magic_link:
+                    update_data["custom_btn_url"] = magic_link
+                supabase.table("channels").update(update_data).eq("chat_id", chat.id).execute()
+        except Exception as e:
+            logger.error(f"Error persisting channel {chat.id} to Supabase: {e}")
 
+        confirmation_text = (
+            f"✅ <b>Successfully Connected to {chat.title}!</b>\n\n"
+            f"• Type: <b>{chat.type.capitalize()}</b>\n"
+            f"• Chat ID: <code>{chat.id}</code>\n"
+            f"• Auto-Accept Engine: <b>Active</b>\n"
+            f"• Magic Link: {magic_link if magic_link else '<i>Use existing join-request link</i>'}\n\n"
+            f"Tap below to configure welcome copy and smart buttons:"
+        )
+
+        # 1. Send confirmation to Admin's private Telegram chat
         try:
             await context.bot.send_message(
-                chat_id=admin_user.id,
-                text=(
-                    f"✅ <b>Successfully Connected to {chat.title}!</b>\n\n"
-                    f"• Channel ID: <code>{chat.id}</code>\n"
-                    f"• Auto-Accept Engine: <b>Active</b>\n"
-                    f"• Magic Link: {magic_link if magic_link else '<i>Use existing join link</i>'}\n\n"
-                    f"Tap below to configure your welcome messages and smart buttons:"
-                ),
+                chat_id=effective_admin_id,
+                text=confirmation_text,
                 parse_mode="HTML",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("⚡ Open Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
                 ])
             )
         except Exception as e:
-            logger.info(f"Could not dispatch DM to admin {admin_user.id}: {e}")
+            logger.info(f"Could not send DM to admin {effective_admin_id}: {e}")
 
-    elif new_status in ["left", "kicked", "member"] and old_status == "administrator":
-        supabase.table("channels").update({"is_active": False}).eq("chat_id", chat.id).execute()
+        # 2. For groups and supergroups, also post directly in the chat for visibility
+        if chat.type in ["group", "supergroup"]:
+            try:
+                await context.bot.send_message(
+                    chat_id=chat.id,
+                    text=(
+                        f"⚡ <b>Auto Request Acceptor Activated!</b>\n\n"
+                        f"This group is now monitored. New members requesting access via join links "
+                        f"will receive customized welcome cards and automated instant approvals."
+                    ),
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                logger.info(f"Could not send confirmation to group {chat.id}: {e}")
+
+    # Case C: Bot Demoted, Kicked, or Removed
+    elif new_status in ["left", "kicked"] and old_status == "administrator":
         try:
+            supabase.table("channels").update({"is_active": False}).eq("chat_id", chat.id).execute()
             await context.bot.send_message(
-                chat_id=admin_user.id,
+                chat_id=effective_admin_id,
                 text=(
-                    f"⚠️ <b>Channel Alert: {chat.title}</b>\n\n"
-                    "The bot's administrator rights have been removed or revoked. "
-                    "Auto-approval has been paused for this channel."
+                    f"⚠️ <b>Community Alert: {chat.title}</b>\n\n"
+                    "The bot's administrator rights have been revoked. "
+                    "Auto-approval has been paused for this community."
                 ),
                 parse_mode="HTML"
             )
         except Exception as e:
-            logger.info(f"Could not alert admin on demotion: {e}")
+            logger.info(f"Could not alert on demotion: {e}")
 
 
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -364,7 +416,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not channel.get("is_active", True):
         return
 
-    channel_title = channel.get("chat_title", req.chat.title or "Channel")
+    channel_title = channel.get("chat_title", req.chat.title or "Community")
     current_time_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
 
     if channel.get("event_mode_enabled") and channel.get("event_message"):
@@ -408,7 +460,6 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     silent = bool(channel.get("silent_dm", False))
     banner_file_id = channel.get("banner_file_id")
 
-    # PRE-APPROVAL DISPATCH: Deliver welcome DM before finalizing approval
     async def dispatch_and_approve():
         try:
             if banner_file_id:
@@ -451,7 +502,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     await floodguard_queue.put((dispatch_and_approve, (), {}))
 
 # ============================================================================
-# FASTAPI APPLICATION LIFESPAN & ENGINE RUNNER
+# FASTAPI LIFESPAN & APPLICATION RUNNER
 # ============================================================================
 tg_application: Optional[Application] = None
 
@@ -874,11 +925,7 @@ async def save_channel_defaults_api(payload: ChannelDefaultsPayload):
 
 @app.get("/api/owner/export-subscribers-csv/{admin_id}")
 async def export_subscribers_csv(admin_id: int):
-    """
-    Direct Telegram Document Dispatch:
-    Generates the CSV in-memory and delivers it directly to your Telegram chat.
-    Bypasses Android/iOS Mini App WebView download blocks.
-    """
+    """Generates CSV in-memory and dispatches directly to admin Telegram chat."""
     verify_owner(admin_id)
     if not tg_application:
         raise HTTPException(status_code=503, detail="Telegram engine offline")
