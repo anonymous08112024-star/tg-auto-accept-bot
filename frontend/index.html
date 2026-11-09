@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Bot Control Center</title>
+  <title>Control Center</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -16,10 +16,10 @@
 </head>
 <body class="p-4 pb-28 max-w-lg mx-auto">
 
-  <!-- LOCKED STATE (OUTSIDE TELEGRAM BROWSER) -->
+  <!-- ACCESS RESTRICTED SCREEN -->
   <div id="unauthorizedScreen" class="hidden py-20 text-center space-y-4">
-    <div class="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-rose-500/10 border border-rose-500/20 text-3xl">
-      🔒
+    <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-2xl text-rose-400">
+      Lock
     </div>
     <div class="space-y-1.5 px-4">
       <h2 class="text-base font-bold text-white tracking-tight">Access Restricted</h2>
@@ -29,7 +29,7 @@
     </div>
     <div class="pt-2">
       <div class="inline-block bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-[11px] text-slate-300">
-        Open <b class="text-blue-400">@AutoRequestAcceptorxBot</b> and tap <code class="bg-slate-800 px-1.5 py-0.5 rounded text-amber-300">⚡ Dashboard</code>
+        Open <b class="text-blue-400">@AutoRequestAcceptorxBot</b> and tap <code class="bg-slate-800 px-1.5 py-0.5 rounded text-amber-300">Dashboard</code>
       </div>
     </div>
   </div>
@@ -40,8 +40,8 @@
     <!-- Top Bar -->
     <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
       <div>
-        <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-          <span>⚡</span> Control Center
+        <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
+          Control Center
         </h1>
         <p class="text-[11px] text-slate-400" id="headerSubtitle">@AutoRequestAcceptorxBot Hub</p>
       </div>
@@ -52,7 +52,7 @@
 
     <!-- Loading State -->
     <div id="loading" class="py-12 text-center text-slate-400 text-sm">
-      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-3"></div>
+      <div class="inline-block animate-spin rounded-full h-7 w-7 border-b-2 border-blue-500 mb-3"></div>
       <p>Syncing secure channel records...</p>
     </div>
 
@@ -63,10 +63,9 @@
       
       <!-- No Communities Connected -->
       <div id="noChannels" class="hidden bg-slate-900/60 border border-slate-800 rounded-2xl p-6 text-center">
-        <div class="text-3xl mb-2">📢</div>
         <h3 class="text-sm font-semibold text-white mb-1">No Communities Connected</h3>
         <p class="text-xs text-slate-400 leading-relaxed">
-          Add <b>@AutoRequestAcceptorxBot</b> as an <b>Administrator</b> with <i>Invite Users via Link</i> permission in your channel or group to begin.
+          Add <b>@AutoRequestAcceptorxBot</b> as an <b>Administrator</b> with <i>Invite Users via Link</i> enabled in your channel to begin.
         </p>
       </div>
 
@@ -77,18 +76,18 @@
           <div class="flex items-center justify-between">
             <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Target Community</label>
             <div class="flex items-center gap-3">
-              <button type="button" onclick="openMagicLinkModal()" class="text-[11px] text-emerald-400 font-semibold hover:underline flex items-center gap-1">
-                ➕ New Magic Link
+              <button type="button" onclick="openMagicLinkModal()" class="text-[11px] text-emerald-400 font-semibold hover:underline">
+                + New Magic Link
               </button>
-              <button type="button" id="refreshChannelsBtn" onclick="refreshChannelsList()" class="text-[11px] text-blue-400 font-semibold hover:underline flex items-center gap-1">
-                🔄 Refresh
+              <button type="button" id="refreshChannelsBtn" onclick="refreshChannelsList()" class="text-[11px] text-blue-400 font-semibold hover:underline">
+                Refresh
               </button>
             </div>
           </div>
           <select id="channelSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500"></select>
         </div>
 
-        <!-- Channel Horizon Metrics Matrix -->
+        <!-- Metrics Matrix -->
         <div class="grid grid-cols-3 gap-2 bg-slate-900/70 border border-slate-800 p-3 rounded-2xl text-center">
           <div>
             <p class="text-[10px] text-slate-400">Last 24h</p>
@@ -104,54 +103,59 @@
           </div>
         </div>
 
-        <!-- Banner Status Bar -->
-        <div class="flex items-center justify-between bg-slate-900/70 border border-slate-800 px-3.5 py-2.5 rounded-xl text-xs">
-          <div class="flex items-center gap-2">
-            <span id="bannerIndicator" class="h-2 w-2 rounded-full bg-slate-600"></span>
-            <span id="bannerStatusText" class="text-slate-300">Banner: Text-only</span>
+        <!-- Banner Status Bar & Thumbnail -->
+        <div class="bg-slate-900/70 border border-slate-800 p-3 rounded-xl space-y-2 text-xs">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span id="bannerIndicator" class="h-2 w-2 rounded-full bg-slate-600"></span>
+              <span id="bannerStatusText" class="text-slate-300">Banner: Text-only</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="setBannerBtn" class="text-[11px] font-semibold text-blue-400 hover:text-blue-300">
+                Attach Photo
+              </button>
+              <span class="text-slate-700">|</span>
+              <button id="removeBannerBtn" class="text-[11px] font-semibold text-rose-400 hover:text-rose-300">
+                Remove
+              </button>
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <button id="setBannerBtn" class="text-[11px] font-semibold text-blue-400 hover:text-blue-300 transition-colors">
-              📸 Set Photo
-            </button>
-            <span class="text-slate-700">|</span>
-            <button id="removeBannerBtn" class="text-[11px] font-semibold text-rose-400 hover:text-rose-300 transition-colors">
-              Remove
-            </button>
+          <div id="channelBannerPreviewContainer" class="hidden pt-1">
+            <img id="channelBannerThumb" src="" alt="Banner Thumbnail" class="w-full h-32 object-cover rounded-lg border border-slate-800" onerror="this.classList.add('hidden')">
           </div>
         </div>
 
-        <!-- Live Subscriber DM Preview -->
+        <!-- Approval Card Live Preview -->
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Approval Card Live Preview</label>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Approval Card Preview</label>
           <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 shadow-xl">
             <div class="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50 space-y-2.5">
               <div id="previewBannerBadge" class="hidden bg-blue-500/20 text-blue-300 text-[10px] px-2.5 py-1 rounded-md text-center font-semibold">
-                🖼️ PHOTO BANNER ATTACHED
+                Photo Banner Attached
               </div>
-              <p class="text-xs font-semibold text-blue-400" id="previewTitle">🎉 Request Approved!</p>
-              <p class="text-xs text-slate-200 whitespace-pre-line leading-relaxed" id="previewMessage">Welcome to the channel!</p>
+              <p class="text-xs font-semibold text-blue-400" id="previewTitle">Request Approved</p>
+              <p class="text-xs text-slate-200 whitespace-pre-line leading-relaxed" id="previewMessage">Welcome to the channel.</p>
               
               <div class="pt-2 border-t border-slate-700/60 space-y-1.5">
                 <button id="previewBtn1" class="w-full py-2 px-3 text-xs font-medium text-center bg-blue-600 text-white rounded-lg pointer-events-none truncate">
-                  📢 Official Community
+                  Official Community
                 </button>
                 <button id="previewBtn2" class="hidden w-full py-2 px-3 text-xs font-medium text-center bg-slate-700/80 text-white rounded-lg pointer-events-none truncate">
                   Secondary Button
                 </button>
                 <button disabled class="w-full py-2 px-3 text-xs font-medium text-center bg-slate-800 text-slate-300 border border-slate-700 rounded-lg opacity-85 cursor-not-allowed truncate">
-                  🔥 Network Co-Promotion Slot
+                  Sponsored Slot
                 </button>
               </div>
-              <p class="text-[10px] text-slate-400 text-center font-medium">⚡ Auto-Approved via @AutoRequestAcceptorxBot</p>
+              <p class="text-[10px] text-slate-400 text-center font-medium">Auto-Approved via @AutoRequestAcceptorxBot</p>
             </div>
           </div>
         </div>
 
-        <!-- Welcome Message & Tags -->
+        <!-- Welcome Message Copy & Tags -->
         <div class="space-y-2">
           <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Welcome Message Copy</label>
-          <textarea id="customMessage" rows="3" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 leading-relaxed" placeholder="Welcome {name}! Your request has been approved."></textarea>
+          <textarea id="customMessage" rows="3" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 leading-relaxed" placeholder="Welcome {name}! Your access request has been approved."></textarea>
           
           <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
             <span class="text-[10px] text-slate-500 font-medium">Insert tag:</span>
@@ -162,7 +166,7 @@
           </div>
         </div>
 
-        <!-- Custom Buttons -->
+        <!-- Custom Inline Buttons -->
         <div class="space-y-3 bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl">
           <p class="text-xs font-semibold text-slate-300">Custom Inline Buttons</p>
           
@@ -187,10 +191,8 @@
         <div class="bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl space-y-3">
           <div class="flex items-center justify-between">
             <div>
-              <h4 class="text-xs font-semibold text-white flex items-center gap-1.5">
-                <span>⚡</span> Event / Match-Day Mode
-              </h4>
-              <p class="text-[10px] text-slate-400">Temporarily override welcome text with high-urgency copy</p>
+              <h4 class="text-xs font-semibold text-white">Event / Match-Day Mode</h4>
+              <p class="text-[10px] text-slate-400">Temporarily override welcome copy with high-urgency text</p>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="eventModeToggle" class="sr-only peer">
@@ -199,7 +201,7 @@
           </div>
           <div id="eventMessageContainer" class="hidden pt-2 border-t border-slate-800 space-y-1.5">
             <label class="block text-[11px] font-medium text-amber-400">Event Message Copy</label>
-            <textarea id="eventMessage" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="🚨 MATCH DAY SPECIAL: Live updates active now!"></textarea>
+            <textarea id="eventMessage" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="Event Special: Live updates active now."></textarea>
           </div>
         </div>
 
@@ -207,7 +209,7 @@
         <div class="grid grid-cols-1 gap-2.5">
           <div class="flex items-center justify-between bg-slate-900/60 border border-slate-800 px-3.5 py-2.5 rounded-2xl">
             <div>
-              <h4 class="text-xs font-semibold text-white">🔕 Silent DM Delivery</h4>
+              <h4 class="text-xs font-semibold text-white">Silent DM Delivery</h4>
               <p class="text-[10px] text-slate-400">Delivers card without sound/vibration alerts</p>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
@@ -218,8 +220,8 @@
 
           <div class="flex items-center justify-between bg-slate-900/60 border border-slate-800 px-3.5 py-2.5 rounded-2xl">
             <div>
-              <h4 class="text-xs font-semibold text-white">🛡️ Anti-Bot & Scraper Shield</h4>
-              <p class="text-[10px] text-slate-400">Rejects automated userbots and flood patterns</p>
+              <h4 class="text-xs font-semibold text-white">Anti-Bot & Scraper Shield</h4>
+              <p class="text-[10px] text-slate-400">Filters automated userbots and flood patterns</p>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="antiBotToggle" class="sr-only peer">
@@ -230,22 +232,20 @@
 
         <!-- Action Buttons -->
         <div class="space-y-2 pt-1">
-          <button id="saveBtn" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all shadow-lg shadow-blue-600/20 active:scale-[0.99]">
+          <button id="saveBtn" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all shadow-md active:scale-[0.99]">
             Save Community Configuration
           </button>
           <button id="testDmBtn" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
-            📲 Send Test DM to My Telegram
+            Send Test DM to My Telegram
           </button>
         </div>
 
-        <!-- Campaign Attribution Tracking -->
+        <!-- Link Attribution -->
         <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 space-y-3">
           <div class="flex items-center justify-between">
             <div>
-              <h4 class="text-xs font-semibold text-white flex items-center gap-1.5">
-                <span>📊</span> Campaign Link Attribution
-              </h4>
-              <p class="text-[10px] text-slate-400">Join conversions per link tag</p>
+              <h4 class="text-xs font-semibold text-white">Campaign Link Attribution</h4>
+              <p class="text-[10px] text-slate-400">Join conversions per invite link</p>
             </div>
             <button id="refreshAnalyticsBtn" class="text-[10px] text-blue-400 font-semibold hover:underline">Refresh</button>
           </div>
@@ -256,12 +256,9 @@
 
         <!-- Disaster Recovery -->
         <div class="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 space-y-2.5">
-          <div class="flex items-center gap-2">
-            <span class="text-base">🚨</span>
-            <div>
-              <h4 class="text-xs font-semibold text-white">Audience Vault & Disaster Recovery</h4>
-              <p class="text-[10px] text-slate-400">Community banned? Request emergency relocation DM</p>
-            </div>
+          <div>
+            <h4 class="text-xs font-semibold text-white">Audience Vault & Disaster Recovery</h4>
+            <p class="text-[10px] text-slate-400">Community banned? Request emergency relocation DM</p>
           </div>
           <div class="space-y-2 pt-1">
             <input type="url" id="migrationTargetInput" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500" placeholder="https://t.me/your_new_backup_channel">
@@ -279,11 +276,11 @@
     <!-- ========================================== -->
     <div id="tabPromoteContent" class="space-y-5 hidden">
       <div class="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-4 space-y-1">
-        <h3 class="text-sm font-bold text-amber-300 flex items-center gap-2">
-          <span>🚀</span> Network Promotion Portal
+        <h3 class="text-sm font-bold text-amber-300">
+          Network Promotion Portal
         </h3>
-        <p class="text-xs text-slate-300 leading-relaxed">
-          Promote your channel or project directly to active users joining channels across our auto-accept network.
+        <p class="text-xs text-slate-300 leading-relaxed" id="promoRulesNoticeText">
+          Promote your project directly to active subscribers across our auto-accept network.
         </p>
       </div>
 
@@ -312,7 +309,7 @@
 
         <div>
           <label class="block text-[11px] font-medium text-slate-400 mb-1">Inline Button Title</label>
-          <input type="text" id="promoBtnText" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="e.g. 🍿 Join Movies VIP">
+          <input type="text" id="promoBtnText" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="e.g. Join VIP Community">
         </div>
 
         <!-- Conditional Direct DM Broadcast Fields -->
@@ -323,45 +320,43 @@
           </div>
 
           <!-- Native Ad Photo Attachment -->
-          <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl flex items-center justify-between text-xs">
-            <div class="flex items-center gap-2">
-              <span id="adPhotoIndicator" class="h-2 w-2 rounded-full bg-slate-600"></span>
-              <span id="adPhotoStatusText" class="text-slate-300">Photo: None</span>
+          <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2 text-xs">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span id="adPhotoIndicator" class="h-2 w-2 rounded-full bg-slate-600"></span>
+                <span id="adPhotoStatusText" class="text-slate-300">Photo: None</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="attachAdPhoto()" class="text-[11px] font-semibold text-blue-400 hover:text-blue-300">
+                  Attach via Bot
+                </button>
+                <span id="removeAdPhotoSeparator" class="hidden text-slate-700">|</span>
+                <button type="button" id="removeAdPhotoBtn" onclick="removeAdPhoto()" class="hidden text-[11px] font-semibold text-rose-400 hover:text-rose-300">
+                  Remove
+                </button>
+              </div>
             </div>
-            <div class="flex items-center gap-2">
-              <button type="button" onclick="attachAdPhoto()" class="text-[11px] font-semibold text-blue-400 hover:text-blue-300">
-                📸 Attach via Bot
-              </button>
-              <span id="removeAdPhotoSeparator" class="hidden text-slate-700">|</span>
-              <button type="button" id="removeAdPhotoBtn" onclick="removeAdPhoto()" class="hidden text-[11px] font-semibold text-rose-400 hover:text-rose-300">
-                Remove
-              </button>
+            <div id="adPhotoPreviewContainer" class="hidden pt-1">
+              <img id="adPhotoThumb" src="" alt="Ad Photo Preview" class="w-full h-32 object-cover rounded-lg border border-slate-800" onerror="this.classList.add('hidden')">
             </div>
           </div>
         </div>
 
         <div>
-          <label class="block text-[11px] font-medium text-slate-400 mb-1">Requested Package / Duration</label>
-          <select id="promoDuration" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
-            <option value="7_days">7 Days Dynamic Network Slot</option>
-            <option value="14_days">14 Days Dynamic Network Slot</option>
-            <option value="30_days">30 Days Dynamic Network Slot</option>
-            <option value="500_clicks">Performance: 500 Verified Clicks</option>
-            <option value="broadcast_all">Full Network Direct DM Broadcast</option>
-          </select>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Select Package & Pricing</label>
+          <select id="promoDuration" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"></select>
         </div>
 
         <div>
           <label class="block text-[11px] font-medium text-slate-400 mb-1">Notes / Pitch to Management</label>
-          <textarea id="promoPitch" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="Add details or barter traffic proposals..."></textarea>
+          <textarea id="promoPitch" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="Targeting preferences or specific requirements..."></textarea>
         </div>
 
-        <!-- Test Preview Button & Submit Action -->
         <div class="space-y-2 pt-1 border-t border-slate-800">
           <button type="button" id="testPromoBtn" onclick="sendPromoTestDm()" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
-            📲 Send Test Preview to My Telegram
+            Send Test Preview to My Telegram
           </button>
-          <button id="submitPromoAppBtn" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99] shadow-lg shadow-amber-600/20">
+          <button id="submitPromoAppBtn" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99] shadow-md">
             Submit Promotion Application
           </button>
         </div>
@@ -382,23 +377,34 @@
             <p class="text-xs font-semibold text-white">Promote Tab in Admin Navigation</p>
             <p class="text-[10px] text-slate-400">When enabled, admins can view and submit ad applications</p>
           </div>
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="flagPromoPortalToggle" class="sr-only peer">
-            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
-          </label>
+          <div class="flex items-center gap-3">
+            <button type="button" onclick="openPromoSettingsModal()" class="text-xs text-slate-400 hover:text-white font-semibold p-1.5 rounded-lg bg-slate-800 border border-slate-700">
+              Settings
+            </button>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="flagPromoPortalToggle" class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+            </label>
+          </div>
         </div>
       </div>
 
-      <!-- Live Broadcast & Migration Delivery Tracker -->
+      <!-- Live Delivery Sentinel -->
       <div id="liveTrackerCard" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <span class="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <h3 class="text-xs font-bold text-white tracking-tight">Live Delivery Sentinel</h3>
           </div>
-          <button type="button" onclick="refreshLiveJobs()" class="text-[10px] text-blue-400 font-semibold hover:underline">
-            🔄 Check Status
-          </button>
+          <div class="flex items-center gap-2.5">
+            <button type="button" onclick="clearLiveJobsHistory()" class="text-[10px] text-rose-400 font-semibold hover:underline">
+              Clear History
+            </button>
+            <span class="text-slate-700">|</span>
+            <button type="button" onclick="refreshLiveJobs()" class="text-[10px] text-blue-400 font-semibold hover:underline">
+              Check Status
+            </button>
+          </div>
         </div>
         <div id="liveJobsContainer" class="space-y-2 text-xs">
           <p class="text-slate-500 text-[11px]">No active dispatch jobs in queue.</p>
@@ -427,23 +433,22 @@
       <!-- Quick Action Controls -->
       <div class="grid grid-cols-3 gap-2">
         <button id="exportCsvBtn" class="py-2.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-semibold text-emerald-400 flex flex-col items-center justify-center gap-1 active:scale-95 transition-all">
-          <span class="text-base">📥</span> Export CSV
+          Export CSV
         </button>
         <button id="openDefaultsModalBtn" class="py-2.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-semibold text-blue-400 flex flex-col items-center justify-center gap-1 active:scale-95 transition-all">
-          <span class="text-base">⚙️</span> New Defaults
+          New Defaults
         </button>
         <button id="openSubBroadcastBtn" class="py-2.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-semibold text-amber-400 flex flex-col items-center justify-center gap-1 active:scale-95 transition-all">
-          <span class="text-base">📣</span> Sub Broadcast
+          Sub Broadcast
         </button>
       </div>
 
-      <!-- Promotion Applications Queue -->
+      <!-- Pending Promotion Applications Review -->
       <div id="pendingPromoCard" class="hidden bg-amber-950/20 border border-amber-800/50 rounded-2xl p-4 space-y-3">
-        <div class="flex items-center gap-2">
-          <span class="text-base">🚀</span>
+        <div class="flex items-center justify-between">
           <div>
             <h3 class="text-xs font-semibold text-amber-300">Pending Promotion Applications</h3>
-            <p class="text-[10px] text-slate-400">Review creative copy and schedule into rotation</p>
+            <p class="text-[10px] text-slate-400">Review creative copy, inspect test preview, and authorize</p>
           </div>
         </div>
         <div id="promoApplicationsList" class="space-y-3 text-xs"></div>
@@ -451,12 +456,9 @@
 
       <!-- Disaster Recovery Migration Queue -->
       <div id="pendingMigrationsCard" class="hidden bg-rose-950/20 border border-rose-800/50 rounded-2xl p-4 space-y-3">
-        <div class="flex items-center gap-2">
-          <span class="text-base">🚨</span>
-          <div>
-            <h3 class="text-xs font-semibold text-rose-300">Pending Migration Requests</h3>
-            <p class="text-[10px] text-slate-400">Review copy, test private DM, and authorize relocation</p>
-          </div>
+        <div>
+          <h3 class="text-xs font-semibold text-rose-300">Pending Migration Requests</h3>
+          <p class="text-[10px] text-slate-400">Review copy, test private DM, and authorize relocation</p>
         </div>
         <div id="migrationQueueList" class="space-y-3 text-xs"></div>
       </div>
@@ -464,9 +466,7 @@
       <!-- Co-Promotion Slots & Telemetry -->
       <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3.5">
         <div>
-          <h3 class="text-xs font-semibold text-white flex items-center gap-1.5">
-            <span>🔥</span> Dynamic Co-Promotion Engine & Telemetry
-          </h3>
+          <h3 class="text-xs font-semibold text-white">Dynamic Co-Promotion Engine & Telemetry</h3>
           <p class="text-[10px] text-slate-400">3 slots routed through <code>/r/{slot_id}</code> with click metrics</p>
         </div>
         <div class="space-y-3" id="promoSlotsContainer"></div>
@@ -495,14 +495,14 @@
 
       <!-- Network Admin Broadcast Engine -->
       <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3">
-        <div class="flex items-center gap-2">
-          <span class="text-base">📢</span>
-          <div>
-            <h3 class="text-xs font-semibold text-white">Broadcast Announcement to Admins</h3>
-            <p class="text-[10px] text-slate-400">Dispatches notification to all connected channel admins</p>
-          </div>
+        <div>
+          <h3 class="text-xs font-semibold text-white">Broadcast Announcement to Admins</h3>
+          <p class="text-[10px] text-slate-400">Dispatches notification to all connected channel admins</p>
         </div>
-        <textarea id="broadcastInput" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="Type administrative announcement or update..."></textarea>
+        <textarea id="broadcastInput" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="Type administrative announcement..."></textarea>
+        <p class="text-[10px] text-slate-500">
+          Tip: Add <code class="text-amber-400 bg-slate-950 px-1 py-0.5 rounded">/read</code> at the end of your message to attach a clean "Mark as read" confirmation button.
+        </p>
         <button id="sendBroadcastBtn" class="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all active:scale-[0.99]">
           Dispatch Admin Broadcast
         </button>
@@ -532,25 +532,90 @@
     </div>
   </nav>
 
+  <!-- ========================================== -->
+  <!-- MODAL: PROMO PACKAGES & PRICING SETTINGS   -->
+  <!-- ========================================== -->
+  <div id="promoSettingsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-sm font-bold text-white">Promotion Packages & Rules</h3>
+          <p class="text-[11px] text-slate-400">Configure prices, slot durations, and advertiser guidelines</p>
+        </div>
+        <button onclick="closePromoSettingsModal()" class="text-slate-400 hover:text-white text-lg font-bold px-1">✕</button>
+      </div>
+      <div class="space-y-3 text-xs max-h-[65vh] overflow-y-auto pr-1">
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Notice / Guidelines Text</label>
+          <textarea id="setNoticeText" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"></textarea>
+        </div>
+
+        <div class="space-y-2 pt-1 border-t border-slate-800">
+          <p class="text-[11px] font-semibold text-amber-300">Slot Packages & Pricing</p>
+          <div id="slotPackagesInputsContainer" class="space-y-2"></div>
+        </div>
+
+        <div class="space-y-2 pt-1 border-t border-slate-800">
+          <p class="text-[11px] font-semibold text-amber-300">Broadcast Packages & Pricing</p>
+          <div id="broadcastPackagesInputsContainer" class="space-y-2"></div>
+        </div>
+      </div>
+      <button onclick="savePromoPackagesConfig()" class="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs transition-all">
+        Save Packages Configuration
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: MULTI-COMMUNITY BROADCAST TARGETING -->
+  <!-- ========================================== -->
+  <div id="multiTargetModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-sm font-bold text-white">Select Broadcast Communities</h3>
+          <p class="text-[11px] text-slate-400" id="multiTargetSubtitle">Target specific communities or full network</p>
+        </div>
+        <button onclick="closeMultiTargetModal()" class="text-slate-400 hover:text-white text-lg font-bold px-1">✕</button>
+      </div>
+      
+      <div class="space-y-3 text-xs">
+        <div class="flex items-center justify-between bg-slate-950 border border-slate-800 p-2.5 rounded-xl">
+          <span class="text-slate-300 font-medium">Select All Communities</span>
+          <input type="checkbox" id="selectAllChannelsCheck" onchange="toggleSelectAllChannels(this.checked)" class="accent-amber-500 h-4 w-4">
+        </div>
+
+        <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl max-h-48 overflow-y-auto space-y-2" id="channelCheckboxesList"></div>
+
+        <div class="bg-slate-900 border border-amber-900/40 p-3 rounded-xl flex items-center justify-between text-xs">
+          <span class="text-slate-400">Deduplicated Reach:</span>
+          <span class="font-bold text-amber-300" id="liveTargetAudienceCount">0 unique users</span>
+        </div>
+
+        <button id="confirmTargetDispatchBtn" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-xs transition-all">
+          Authorize & Dispatch Broadcast
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: MAGIC LINK GENERATOR -->
   <div id="magicLinkModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
-          <span>➕</span> Generate Magic Link
-        </h3>
+        <h3 class="text-sm font-bold text-white">Generate Magic Link</h3>
         <button onclick="closeMagicLinkModal()" class="text-slate-400 hover:text-white text-lg font-bold px-1">✕</button>
       </div>
       <div class="space-y-3 text-xs">
         <div>
           <label class="block text-[11px] font-medium text-slate-400 mb-1">Campaign Link Name</label>
-          <input type="text" id="mlCampaignName" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500" placeholder="e.g. Instagram Promo / Paid Ads">
+          <input type="text" id="mlCampaignName" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500" placeholder="e.g. Paid Ads">
         </div>
         <div id="mlResultArea" class="hidden bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
           <p class="text-[10px] text-emerald-400 font-medium">Link ready with Admin Approval turned ON:</p>
           <input type="text" id="mlResultInput" readonly class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white">
           <button type="button" onclick="copyMagicLink()" class="w-full py-1.5 bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/40 rounded-lg font-semibold text-xs">
-            📋 Copy Link
+            Copy Link
           </button>
         </div>
         <button id="generateMagicLinkBtn" onclick="generateMagicLink()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-xs transition-all">
@@ -565,9 +630,7 @@
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div>
-          <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
-            <span>🔍</span> Admin Communities & Moderation Audit
-          </h3>
+          <h3 class="text-sm font-bold text-white">Admin Communities Audit</h3>
           <p class="text-[11px] text-slate-400" id="inspectAdminTitle">Admin ID: ...</p>
         </div>
         <button onclick="closeInspectModal()" class="text-slate-400 hover:text-white text-lg font-bold px-2">✕</button>
@@ -581,8 +644,8 @@
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div>
-          <h3 class="text-sm font-bold text-white">⚙️ Global New Community Defaults</h3>
-          <p class="text-[11px] text-slate-400">Settings applied automatically to all newly added communities</p>
+          <h3 class="text-sm font-bold text-white">Global New Community Defaults</h3>
+          <p class="text-[11px] text-slate-400">Settings applied automatically to newly added communities</p>
         </div>
         <button onclick="closeDefaultsModal()" class="text-slate-400 hover:text-white text-lg font-bold px-2">✕</button>
       </div>
@@ -621,23 +684,29 @@
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div>
-          <h3 class="text-sm font-bold text-white">📣 Segmented Subscriber Broadcast</h3>
+          <h3 class="text-sm font-bold text-white">Segmented Subscriber Broadcast</h3>
           <p class="text-[10px] text-slate-400">Deliver announcements via FloodGuard directly to subscribers</p>
         </div>
         <button onclick="closeSubBroadcastModal()" class="text-slate-400 hover:text-white text-lg font-bold px-2">✕</button>
       </div>
       <div class="space-y-3 text-xs">
         <div>
-          <label class="block text-[11px] font-medium text-slate-400 mb-1">Target Audience Segment</label>
-          <select id="broadTargetType" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500">
-            <option value="all">🌍 All Network Subscribers (Global Vault)</option>
-            <option value="channel">🎯 Specific Community Audience Only</option>
-          </select>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Target Audience</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" id="btnSubTargetAll" onclick="setSubTargetType('all')" class="py-2 px-3 rounded-xl border border-amber-500/50 bg-amber-500/20 text-amber-300 font-semibold text-xs">
+              All Network Vault
+            </button>
+            <button type="button" id="btnSubTargetCustom" onclick="setSubTargetType('custom')" class="py-2 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 font-semibold text-xs">
+              Select Communities
+            </button>
+          </div>
         </div>
-        <div id="broadChannelSelectContainer" class="hidden">
-          <label class="block text-[11px] font-medium text-slate-400 mb-1">Select Community Audience</label>
-          <select id="broadChannelSelect" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"></select>
+
+        <div id="subCustomChannelsContainer" class="hidden space-y-2">
+          <div class="bg-slate-950 border border-slate-800 p-2.5 rounded-xl max-h-36 overflow-y-auto space-y-1.5" id="subChannelChecklist"></div>
+          <p class="text-[10px] text-amber-400 font-medium">Selected Reach: <span id="subLiveAudienceReach">0 unique users</span></p>
         </div>
+
         <div>
           <label class="block text-[11px] font-medium text-slate-400 mb-1">Announcement Message (HTML Supported)</label>
           <textarea id="broadMessageInput" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500" placeholder="Type message to broadcast to subscribers..."></textarea>
@@ -698,6 +767,8 @@
     const channelSelect = document.getElementById("channelSelect");
     const bannerIndicator = document.getElementById("bannerIndicator");
     const bannerStatusText = document.getElementById("bannerStatusText");
+    const channelBannerPreviewContainer = document.getElementById("channelBannerPreviewContainer");
+    const channelBannerThumb = document.getElementById("channelBannerThumb");
     const setBannerBtn = document.getElementById("setBannerBtn");
     const removeBannerBtn = document.getElementById("removeBannerBtn");
 
@@ -740,12 +811,15 @@
     const promoBroadcastMessage = document.getElementById("promoBroadcastMessage");
     const adPhotoIndicator = document.getElementById("adPhotoIndicator");
     const adPhotoStatusText = document.getElementById("adPhotoStatusText");
+    const adPhotoPreviewContainer = document.getElementById("adPhotoPreviewContainer");
+    const adPhotoThumb = document.getElementById("adPhotoThumb");
     const removeAdPhotoBtn = document.getElementById("removeAdPhotoBtn");
     const removeAdPhotoSeparator = document.getElementById("removeAdPhotoSeparator");
     const promoDuration = document.getElementById("promoDuration");
     const promoPitch = document.getElementById("promoPitch");
     const submitPromoAppBtn = document.getElementById("submitPromoAppBtn");
     const testPromoBtn = document.getElementById("testPromoBtn");
+    const promoRulesNoticeText = document.getElementById("promoRulesNoticeText");
 
     // Owner HQ Controls
     const flagPromoPortalToggle = document.getElementById("flagPromoPortalToggle");
@@ -788,13 +862,27 @@
     const saveDefaultsBtn = document.getElementById("saveDefaultsBtn");
 
     const subBroadcastModal = document.getElementById("subBroadcastModal");
-    const broadTargetType = document.getElementById("broadTargetType");
-    const broadChannelSelectContainer = document.getElementById("broadChannelSelectContainer");
-    const broadChannelSelect = document.getElementById("broadChannelSelect");
+    const btnSubTargetAll = document.getElementById("btnSubTargetAll");
+    const btnSubTargetCustom = document.getElementById("btnSubTargetCustom");
+    const subCustomChannelsContainer = document.getElementById("subCustomChannelsContainer");
+    const subChannelChecklist = document.getElementById("subChannelChecklist");
+    const subLiveAudienceReach = document.getElementById("subLiveAudienceReach");
     const broadMessageInput = document.getElementById("broadMessageInput");
     const broadBtnText = document.getElementById("broadBtnText");
     const broadBtnUrl = document.getElementById("broadBtnUrl");
     const dispatchSubBroadcastBtn = document.getElementById("dispatchSubBroadcastBtn");
+
+    // Multi Target Approval Modal
+    const multiTargetModal = document.getElementById("multiTargetModal");
+    const channelCheckboxesList = document.getElementById("channelCheckboxesList");
+    const liveTargetAudienceCount = document.getElementById("liveTargetAudienceCount");
+    const confirmTargetDispatchBtn = document.getElementById("confirmTargetDispatchBtn");
+
+    // Promo Settings Modal
+    const promoSettingsModal = document.getElementById("promoSettingsModal");
+    const setNoticeText = document.getElementById("setNoticeText");
+    const slotPackagesInputsContainer = document.getElementById("slotPackagesInputsContainer");
+    const broadcastPackagesInputsContainer = document.getElementById("broadcastPackagesInputsContainer");
 
     let isOwner = false;
     let myChannels = [];
@@ -804,6 +892,9 @@
     let selectedPromoType = "slot";
     let liveTrackerInterval = null;
     let isPromoPortalActive = false;
+    let promoConfig = null;
+    let currentApprovingAppId = null;
+    let subBroadcastTargetMode = "all";
 
     function authHeaders() {
       return {
@@ -838,6 +929,7 @@
         navPromoteBtn.classList.add("text-amber-400", "font-semibold");
         navPromoteBtn.classList.remove("text-slate-400");
         checkAdDraftPhoto();
+        renderPublicPromoPackages();
       } else if (tab === "owner" && isOwner) {
         tabOwnerContent.classList.remove("hidden");
         navOwnerBtn.classList.add("text-amber-400", "font-semibold");
@@ -898,11 +990,11 @@
 
     window.refreshChannelsList = async function() {
       const btn = document.getElementById("refreshChannelsBtn");
-      if (btn) btn.innerText = "⏳ Loading...";
+      if (btn) btn.innerText = "Syncing...";
       await loadChannels();
       await loadPublicFlags();
       if (isOwner) await loadOwnerDashboard();
-      if (btn) btn.innerText = "🔄 Refresh";
+      if (btn) btn.innerText = "Refresh";
       tg?.HapticFeedback?.notificationOccurred("success");
     };
 
@@ -927,10 +1019,11 @@
         tabHomeContent.classList.remove("hidden");
 
         await loadPublicFlags();
+        await loadPromoPackages();
 
         if (data.is_owner && Number(user.id) === 5527067319) {
           isOwner = true;
-          roleBadge.innerText = "👑 Master Owner";
+          roleBadge.innerText = "Master Owner";
           roleBadge.className = "text-[11px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-full font-semibold";
           navOwnerBtn.classList.remove("hidden");
           startLiveTrackerPoller();
@@ -942,6 +1035,8 @@
           adminInspectModal?.remove();
           defaultsModal?.remove();
           subBroadcastModal?.remove();
+          multiTargetModal?.remove();
+          promoSettingsModal?.remove();
         }
 
         if (data.success && data.channels.length > 0) {
@@ -965,8 +1060,8 @@
       cJoins30d.innerText = currentChannel.joins_30d || 0;
       cJoins90d.innerText = currentChannel.joins_90d || 0;
 
-      customMessage.value = currentChannel.custom_message || "Welcome to {channel}! Your request has been approved.";
-      btn1Text.value = currentChannel.custom_btn_text || `📢 ${currentChannel.chat_title}`;
+      customMessage.value = currentChannel.custom_message || "Welcome to {channel}! Your access request has been approved.";
+      btn1Text.value = currentChannel.custom_btn_text || `Enter ${currentChannel.chat_title}`;
       btn1Url.value = currentChannel.custom_btn_url || "";
       btn2Text.value = currentChannel.custom_btn_2_text || "";
       btn2Url.value = currentChannel.custom_btn_2_url || "";
@@ -986,11 +1081,14 @@
       if (currentChannel.banner_file_id) {
         bannerIndicator.className = "h-2 w-2 rounded-full bg-emerald-400";
         bannerStatusText.innerText = "Banner: Photo Active";
+        channelBannerThumb.src = `${BACKEND_URL}/api/media/preview/${currentChannel.banner_file_id}`;
+        channelBannerPreviewContainer.classList.remove("hidden");
         previewBannerBadge.classList.remove("hidden");
         removeBannerBtn.classList.remove("hidden");
       } else {
         bannerIndicator.className = "h-2 w-2 rounded-full bg-slate-600";
         bannerStatusText.innerText = "Banner: Text-only";
+        channelBannerPreviewContainer.classList.add("hidden");
         previewBannerBadge.classList.add("hidden");
         removeBannerBtn.classList.add("hidden");
       }
@@ -1007,7 +1105,7 @@
     function updatePreview() {
       if (!currentChannel) return;
 
-      previewTitle.innerText = `🎉 Request Approved for ${currentChannel.chat_title}!`;
+      previewTitle.innerText = `Request Approved for ${currentChannel.chat_title}`;
 
       if (eventModeToggle.checked && eventMessage.value.trim()) {
         previewMessage.innerText = eventMessage.value.trim()
@@ -1019,7 +1117,7 @@
           .replace("{channel}", currentChannel.chat_title);
       }
 
-      previewBtn1.innerText = btn1Text.value.trim() || `📢 ${currentChannel.chat_title}`;
+      previewBtn1.innerText = btn1Text.value.trim() || `Enter ${currentChannel.chat_title}`;
 
       if (btn2Text.value.trim() && btn2Url.value.trim()) {
         previewBtn2.innerText = btn2Text.value.trim();
@@ -1103,12 +1201,12 @@
         if (result.success) {
           Object.assign(currentChannel, payload);
           tg?.HapticFeedback?.notificationOccurred("success");
-          alert("Community configuration updated successfully!");
+          alert("Community configuration updated.");
         } else {
           alert("Error: " + (result.error || "Could not save."));
         }
       } catch (e) {
-        alert("Network communication error.");
+        alert("Communication error.");
       } finally {
         saveBtn.disabled = false;
         saveBtn.innerText = "Save Community Configuration";
@@ -1118,7 +1216,7 @@
     testDmBtn.addEventListener("click", async () => {
       if (!currentChannel) return;
       testDmBtn.disabled = true;
-      testDmBtn.innerText = "Dispatching preview...";
+      testDmBtn.innerText = "Dispatching...";
 
       try {
         const res = await fetch(`${BACKEND_URL}/api/channel/test-dm`, {
@@ -1129,7 +1227,7 @@
         const result = await res.json();
         if (result.success) {
           tg?.HapticFeedback?.notificationOccurred("success");
-          alert("🧪 Test card sent to your private Telegram chat!");
+          alert("Test card sent to your private Telegram chat.");
         } else {
           alert("Test failed: " + (result.error || "Check if bot is started in DM."));
         }
@@ -1137,7 +1235,7 @@
         alert("Failed to communicate with bot.");
       } finally {
         testDmBtn.disabled = false;
-        testDmBtn.innerText = "📲 Send Test DM to My Telegram";
+        testDmBtn.innerText = "Send Test DM to My Telegram";
       }
     });
 
@@ -1180,7 +1278,7 @@
         alert("Please enter a valid Telegram invite link.");
         return;
       }
-      if (!confirm("Submit emergency community migration request to Bot Management?")) return;
+      if (!confirm("Submit emergency community migration request to management?")) return;
 
       requestMigrationBtn.disabled = true;
       requestMigrationBtn.innerText = "Submitting...";
@@ -1193,10 +1291,10 @@
         });
         const result = await res.json();
         if (result.success) {
-          alert(`Migration requested for ${result.audience_count} audience members. Awaiting Owner approval.`);
+          alert(`Migration requested for ${result.audience_count} audience members.`);
           migrationTargetInput.value = "";
         } else {
-          alert("Request failed: " + (result.error || result.detail || "Database error."));
+          alert("Request failed: " + (result.error || result.detail || ""));
         }
       } catch (e) {
         alert("Communication error.");
@@ -1220,7 +1318,7 @@
       const name = mlCampaignName.value.trim() || "Campaign Link";
       const genBtn = document.getElementById("generateMagicLinkBtn");
       genBtn.disabled = true;
-      genBtn.innerText = "Calling Telegram API...";
+      genBtn.innerText = "Generating...";
 
       try {
         const res = await fetch(`${BACKEND_URL}/api/channel/create-magic-link`, {
@@ -1248,10 +1346,35 @@
       mlResultInput.select();
       document.execCommand("copy");
       tg?.HapticFeedback?.notificationOccurred("success");
-      alert("Magic Link copied to clipboard!");
+      alert("Magic Link copied to clipboard.");
     };
 
-    // Promote Portal
+    // Promote Portal & Packages
+    async function loadPromoPackages() {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/system/promo-packages?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: authHeaders()
+        });
+        const data = await res.json();
+        if (data.success && data.packages) {
+          promoConfig = data.packages;
+          promoRulesNoticeText.innerText = promoConfig.rules_notice || "Promote your project directly to active subscribers across our auto-accept network.";
+          renderPublicPromoPackages();
+        }
+      } catch (e) {
+        console.error("Packages sync error:", e);
+      }
+    }
+
+    function renderPublicPromoPackages() {
+      if (!promoConfig) return;
+      const list = selectedPromoType === "slot" ? promoConfig.slot_packages : promoConfig.broadcast_packages;
+      promoDuration.innerHTML = list.map(pkg => `
+        <option value="${pkg.id}">${pkg.title} — ${pkg.price}</option>
+      `).join("");
+    }
+
     window.setPromoType = function(type) {
       selectedPromoType = type;
       if (type === "slot") {
@@ -1264,6 +1387,7 @@
         promoBroadcastFields.classList.remove("hidden");
         checkAdDraftPhoto();
       }
+      renderPublicPromoPackages();
     };
 
     async function checkAdDraftPhoto() {
@@ -1273,14 +1397,17 @@
           headers: authHeaders()
         });
         const data = await res.json();
-        if (data.success && data.has_photo) {
+        if (data.success && data.has_photo && data.banner_file_id) {
           adPhotoIndicator.className = "h-2 w-2 rounded-full bg-emerald-400";
           adPhotoStatusText.innerText = "Photo: Attached";
+          adPhotoThumb.src = `${BACKEND_URL}/api/media/preview/${data.banner_file_id}`;
+          adPhotoPreviewContainer.classList.remove("hidden");
           removeAdPhotoBtn.classList.remove("hidden");
           removeAdPhotoSeparator.classList.remove("hidden");
         } else {
           adPhotoIndicator.className = "h-2 w-2 rounded-full bg-slate-600";
           adPhotoStatusText.innerText = "Photo: None";
+          adPhotoPreviewContainer.classList.add("hidden");
           removeAdPhotoBtn.classList.add("hidden");
           removeAdPhotoSeparator.classList.add("hidden");
         }
@@ -1320,14 +1447,14 @@
       }
 
       testPromoBtn.disabled = true;
-      testPromoBtn.innerText = "Dispatching preview...";
+      testPromoBtn.innerText = "Dispatching...";
 
       const payload = {
         admin_id: user.id,
         promo_type: selectedPromoType,
         community_name: promoCommunityName.value.trim() || "My Project",
         destination_url: url,
-        button_text: promoBtnText.value.trim() || "📢 Open Link",
+        button_text: promoBtnText.value.trim() || "Open Link",
         broadcast_message: selectedPromoType === "broadcast" ? promoBroadcastMessage.value.trim() : ""
       };
 
@@ -1340,7 +1467,7 @@
         const result = await res.json();
         if (result.success) {
           tg?.HapticFeedback?.notificationOccurred("success");
-          alert("🧪 Preview card sent to your private Telegram chat!");
+          alert("Preview card sent to your private Telegram chat.");
         } else {
           alert("Test failed: " + (result.error || ""));
         }
@@ -1348,7 +1475,7 @@
         alert("Communication error.");
       } finally {
         testPromoBtn.disabled = false;
-        testPromoBtn.innerText = "📲 Send Test Preview to My Telegram";
+        testPromoBtn.innerText = "Send Test Preview to My Telegram";
       }
     };
 
@@ -1360,7 +1487,7 @@
       }
 
       submitPromoAppBtn.disabled = true;
-      submitPromoAppBtn.innerText = "Submitting application...";
+      submitPromoAppBtn.innerText = "Submitting...";
 
       const payload = {
         admin_id: user.id,
@@ -1383,7 +1510,7 @@
         const result = await res.json();
         if (result.success) {
           tg?.HapticFeedback?.notificationOccurred("success");
-          alert("🚀 Promotion application submitted successfully! Management has been notified via Telegram.");
+          alert("Promotion application submitted. Management has been notified.");
           promoCommunityName.value = "";
           promoUrl.value = "";
           promoBtnText.value = "";
@@ -1421,11 +1548,7 @@
         allOwnerChannels = data.channels || [];
         channelCountLabel.innerText = `${allOwnerChannels.length} Communities`;
 
-        broadChannelSelect.innerHTML = allOwnerChannels.map(c => `
-          <option value="${c.chat_id}">${c.chat_title} (${c.subscriber_count || 0} reachable subscribers)</option>
-        `).join("");
-
-        // Promo Slots with Telemetry
+        // Render Promo Slots
         promoSlots = data.promo_slots || [];
         promoSlotsContainer.innerHTML = promoSlots.map(slot => `
           <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2.5">
@@ -1471,11 +1594,11 @@
           </div>
         `).join("");
 
-        // Master Channels Directory with Health Sentinel
+        // Master Channels Directory
         masterChannelList.innerHTML = allOwnerChannels.map(ch => {
           const isHealthy = ch.is_active;
           const badgeClass = isHealthy ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' : 'border-rose-500/30 text-rose-400 bg-rose-500/10';
-          const badgeText = isHealthy ? '🟢 Active' : '⚠️ Action Required';
+          const badgeText = isHealthy ? 'Active' : 'Action Required';
 
           return `
             <div class="p-3 flex items-center justify-between gap-3 text-xs">
@@ -1578,7 +1701,27 @@
       }
     };
 
-    // Promotion Applications Review
+    window.clearLiveJobsHistory = async function() {
+      if (!confirm("Clear finished and stuck broadcast records from Live Sentinel?")) return;
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/broadcast-jobs/clear`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ admin_id: user.id })
+        });
+        const result = await res.json();
+        if (result.success) {
+          tg?.HapticFeedback?.notificationOccurred("success");
+          refreshLiveJobs();
+        } else {
+          alert("Error: " + (result.error || ""));
+        }
+      } catch (e) {
+        alert("Failed to clear history.");
+      }
+    };
+
+    // Promotion Applications Review in Owner HQ
     async function loadPendingPromotions() {
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/promotions/${user.id}?t=${Date.now()}`, {
@@ -1589,26 +1732,37 @@
         if (data.success && data.applications.length > 0) {
           pendingPromoCard.classList.remove("hidden");
           promoApplicationsList.innerHTML = data.applications.map(app => `
-            <div class="bg-slate-900 border border-amber-900/60 p-3 rounded-xl space-y-2">
-              <div class="flex items-center justify-between">
+            <div class="bg-slate-900 border border-amber-900/60 p-3.5 rounded-xl space-y-2.5">
+              <div class="flex items-center justify-between border-b border-slate-800 pb-2">
                 <div>
                   <p class="font-bold text-white">${app.promo_type === 'slot' ? 'Slot Promo' : 'Direct DM Broadcast'}</p>
                   <p class="text-[10px] text-slate-400">Applicant: @${app.admin_username || app.admin_id} • Target: ${app.target_channel_title || 'N/A'}</p>
                 </div>
                 <span class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-mono">Pending</span>
               </div>
-              <p class="text-[11px] text-slate-300 break-all">URL: <a href="${app.destination_url}" target="_blank" class="text-blue-400 underline">${app.destination_url}</a></p>
-              ${app.broadcast_message ? `<p class="text-[10px] text-slate-300 bg-slate-950 p-2 rounded border border-slate-800"><b>Message:</b> ${app.broadcast_message}</p>` : ''}
-              ${app.banner_file_id ? `<p class="text-[10px] text-emerald-400"><b>Photo:</b> 🖼️ Native File ID Attached</p>` : ''}
+              
+              ${app.banner_file_id ? `
+                <div class="pt-1">
+                  <img src="${BACKEND_URL}/api/media/preview/${app.banner_file_id}" alt="Creative Preview" class="w-full h-28 object-cover rounded-lg border border-slate-800" onerror="this.classList.add('hidden')">
+                </div>
+              ` : ''}
+
+              <p class="text-[11px] text-slate-300 break-all"><b>Destination:</b> <a href="${app.destination_url}" target="_blank" class="text-blue-400 underline">${app.destination_url}</a></p>
+              ${app.broadcast_message ? `<p class="text-[10px] text-slate-300 bg-slate-950 p-2 rounded border border-slate-800 leading-relaxed"><b>Message Body:</b>\n${app.broadcast_message}</p>` : ''}
               ${app.custom_pitch ? `<p class="text-[10px] text-slate-400 italic">"${app.custom_pitch}"</p>` : ''}
               
-              <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800">
-                <button onclick="handlePromoApplication(${app.id}, 'approve', '${app.promo_type}')" class="py-1 px-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-semibold">
-                  Approve & Schedule
+              <div class="space-y-1.5 pt-1 border-t border-slate-800">
+                <button type="button" onclick="ownerTestPreviewPromo(${app.id})" class="w-full py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 rounded-lg text-[11px] font-semibold">
+                  Send Test Preview to My Chat
                 </button>
-                <button onclick="handlePromoApplication(${app.id}, 'reject', '${app.promo_type}')" class="py-1 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px]">
-                  Reject
-                </button>
+                <div class="grid grid-cols-2 gap-2">
+                  <button onclick="startPromoApprovalFlow(${app.id}, '${app.promo_type}')" class="py-1.5 px-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-semibold">
+                    Approve & Schedule
+                  </button>
+                  <button onclick="handlePromoApplicationAction(${app.id}, 'reject')" class="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px]">
+                    Reject
+                  </button>
+                </div>
               </div>
             </div>
           `).join("");
@@ -1620,18 +1774,137 @@
       }
     }
 
-    window.handlePromoApplication = async function(appId, action, promoType) {
-      if (!confirm(`Are you sure you want to ${action} this application?`)) return;
-      let slotId = 1;
-      let days = 7;
-      if (action === "approve" && promoType === "slot") {
+    window.ownerTestPreviewPromo = async function(appId) {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/promotions/test-preview`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ admin_id: user.id, application_id: appId })
+        });
+        const result = await res.json();
+        if (result.success) {
+          tg?.HapticFeedback?.notificationOccurred("success");
+          alert("Creative test preview sent to your Telegram DM.");
+        } else {
+          alert("Preview error: " + (result.error || ""));
+        }
+      } catch (e) {
+        alert("Failed to communicate with bot.");
+      }
+    };
+
+    window.startPromoApprovalFlow = function(appId, promoType) {
+      currentApprovingAppId = appId;
+      if (promoType === "slot") {
         const slotInput = prompt("Assign to which Slot ID (1, 2, or 3)?", "1");
         if (!slotInput) return;
-        slotId = Number(slotInput);
         const daysInput = prompt("Enter active runtime duration in days:", "7");
         if (!daysInput) return;
-        days = Number(daysInput);
+        executeApproveSlotPromo(appId, Number(slotInput), Number(daysInput));
+      } else {
+        openMultiTargetModal(appId);
       }
+    };
+
+    async function executeApproveSlotPromo(appId, slotId, days) {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/promotions/action`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            admin_id: user.id,
+            application_id: appId,
+            action: "approve",
+            assigned_slot_id: slotId,
+            expires_in_days: days
+          })
+        });
+        const result = await res.json();
+        if (result.success) {
+          alert("Slot promotion approved and scheduled.");
+          loadPendingPromotions();
+          loadOwnerDashboard();
+        } else {
+          alert("Error: " + (result.error || ""));
+        }
+      } catch (e) {
+        alert("Communication error.");
+      }
+    }
+
+    window.handlePromoApplicationAction = async function(appId, action) {
+      if (!confirm(`Are you sure you want to ${action} this application?`)) return;
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/promotions/action`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ admin_id: user.id, application_id: appId, action: action })
+        });
+        const result = await res.json();
+        if (result.success) {
+          alert(`Application ${action}ed.`);
+          loadPendingPromotions();
+        } else {
+          alert("Error: " + (result.error || ""));
+        }
+      } catch (e) {
+        alert("Communication error.");
+      }
+    };
+
+    // Multi-Community Targeting Modal
+    function openMultiTargetModal(appId) {
+      currentApprovingAppId = appId;
+      multiTargetSubtitle.innerText = "Select specific communities to dispatch this broadcast";
+      
+      channelCheckboxesList.innerHTML = allOwnerChannels.map(ch => `
+        <label class="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80 cursor-pointer">
+          <span class="truncate font-medium text-slate-200">${ch.chat_title}</span>
+          <input type="checkbox" value="${ch.chat_id}" onchange="recalcTargetAudience()" class="target-channel-box accent-amber-500 h-4 w-4">
+        </label>
+      `).join("");
+
+      document.getElementById("selectAllChannelsCheck").checked = false;
+      liveTargetAudienceCount.innerText = "0 unique users";
+      confirmTargetDispatchBtn.onclick = () => confirmBroadcastApproval(appId);
+      multiTargetModal.classList.remove("hidden");
+    }
+
+    window.closeMultiTargetModal = () => multiTargetModal.classList.add("hidden");
+
+    window.toggleSelectAllChannels = function(checked) {
+      document.querySelectorAll(".target-channel-box").forEach(cb => cb.checked = checked);
+      recalcTargetAudience();
+    };
+
+    window.recalcTargetAudience = async function() {
+      const selected = Array.from(document.querySelectorAll(".target-channel-box:checked")).map(cb => Number(cb.value));
+      if (!selected.length) {
+        liveTargetAudienceCount.innerText = "0 unique users";
+        return;
+      }
+      liveTargetAudienceCount.innerText = "Calculating...";
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/audience-count`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ admin_id: user.id, chat_ids: selected })
+        });
+        const data = await res.json();
+        if (data.success) {
+          liveTargetAudienceCount.innerText = `${data.count.toLocaleString()} unique users`;
+        }
+      } catch (e) {
+        liveTargetAudienceCount.innerText = "Error calculating";
+      }
+    };
+
+    async function confirmBroadcastApproval(appId) {
+      const selected = Array.from(document.querySelectorAll(".target-channel-box:checked")).map(cb => Number(cb.value));
+      if (!confirm(`Authorize and dispatch broadcast to ${selected.length ? selected.length + ' selected communities' : 'all vault subscribers'}?`)) return;
+
+      confirmTargetDispatchBtn.disabled = true;
+      confirmTargetDispatchBtn.innerText = "Authorizing...";
 
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/promotions/action`, {
@@ -1640,21 +1913,89 @@
           body: JSON.stringify({
             admin_id: user.id,
             application_id: appId,
-            action: action,
-            assigned_slot_id: slotId,
-            expires_in_days: days
+            action: "approve",
+            target_chat_ids: selected.length ? selected : null
           })
         });
         const result = await res.json();
         if (result.success) {
-          alert(`Application ${action}d successfully!`);
+          alert("Broadcast promotion approved and scheduled via FloodGuard.");
+          closeMultiTargetModal();
           loadPendingPromotions();
-          loadOwnerDashboard();
+          refreshLiveJobs();
         } else {
           alert("Error: " + (result.error || ""));
         }
       } catch (e) {
         alert("Communication error.");
+      } finally {
+        confirmTargetDispatchBtn.disabled = false;
+        confirmTargetDispatchBtn.innerText = "Authorize & Dispatch Broadcast";
+      }
+    }
+
+    // Promo Packages Settings Modal (Gear Icon)
+    window.openPromoSettingsModal = function() {
+      if (!promoConfig) return;
+      setNoticeText.value = promoConfig.rules_notice || "";
+
+      slotPackagesInputsContainer.innerHTML = (promoConfig.slot_packages || []).map((pkg, idx) => `
+        <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 grid grid-cols-3 gap-2">
+          <input type="text" id="spTitle_${idx}" class="col-span-2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-white" value="${pkg.title}">
+          <input type="text" id="spPrice_${idx}" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-white text-right" value="${pkg.price}">
+        </div>
+      `).join("");
+
+      broadcastPackagesInputsContainer.innerHTML = (promoConfig.broadcast_packages || []).map((pkg, idx) => `
+        <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 grid grid-cols-3 gap-2">
+          <input type="text" id="bpTitle_${idx}" class="col-span-2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-white" value="${pkg.title}">
+          <input type="text" id="bpPrice_${idx}" class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-white text-right" value="${pkg.price}">
+        </div>
+      `).join("");
+
+      promoSettingsModal.classList.remove("hidden");
+    };
+
+    window.closePromoSettingsModal = () => promoSettingsModal.classList.add("hidden");
+
+    window.savePromoPackagesConfig = async function() {
+      const updatedSlotPackages = (promoConfig.slot_packages || []).map((pkg, idx) => ({
+        ...pkg,
+        title: document.getElementById(`spTitle_${idx}`).value.trim(),
+        price: document.getElementById(`spPrice_${idx}`).value.trim()
+      }));
+
+      const updatedBroadcastPackages = (promoConfig.broadcast_packages || []).map((pkg, idx) => ({
+        ...pkg,
+        title: document.getElementById(`bpTitle_${idx}`).value.trim(),
+        price: document.getElementById(`bpPrice_${idx}`).value.trim()
+      }));
+
+      const newConfig = {
+        slot_packages: updatedSlotPackages,
+        broadcast_packages: updatedBroadcastPackages,
+        rules_notice: setNoticeText.value.trim()
+      };
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/system/promo-packages`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ admin_id: user.id, config: newConfig })
+        });
+        const result = await res.json();
+        if (result.success) {
+          promoConfig = newConfig;
+          promoRulesNoticeText.innerText = promoConfig.rules_notice;
+          renderPublicPromoPackages();
+          tg?.HapticFeedback?.notificationOccurred("success");
+          alert("Promo packages and pricing saved.");
+          closePromoSettingsModal();
+        } else {
+          alert("Error: " + (result.error || ""));
+        }
+      } catch (e) {
+        alert("Failed to save settings.");
       }
     };
 
@@ -1679,7 +2020,7 @@
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
               <button onclick="inspectAdmin(${admin.admin_id})" class="text-[10px] px-2.5 py-1 rounded-lg font-medium bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white transition-all">
-                🔍 Inspect
+                Inspect
               </button>
               <button onclick="directMessageAdmin(${admin.admin_id})" class="text-[10px] px-2.5 py-1 rounded-lg font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700">
                 DM
@@ -1716,7 +2057,7 @@
                 <p class="text-[10px] text-slate-400">ID: ${ch.chat_id} • 24h: <span class="text-blue-400">+${ch.joins_24h || 0}</span> • Subs: ${ch.subscriber_count || 0}</p>
               </div>
               <a href="${ch.custom_btn_url || 'https://t.me'}" target="_blank" class="text-[10px] px-2.5 py-1 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold">
-                🔗 Check Link
+                Link
               </a>
             </div>
 
@@ -1742,7 +2083,7 @@
                 <span>Active</span>
               </label>
               <button onclick="saveChannelOverride(${ch.chat_id})" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg text-[11px] shadow-sm">
-                Save & Override
+                Save Override
               </button>
             </div>
           </div>
@@ -1772,7 +2113,7 @@
         });
         const result = await res.json();
         if (result.success) {
-          alert("Community configuration updated successfully!");
+          alert("Community configuration updated.");
         } else {
           alert("Error: " + (result.error || ""));
         }
@@ -1803,17 +2144,17 @@
 
               <div class="space-y-1.5">
                 <label class="block text-[10px] font-medium text-slate-400">Relocation Message Copy</label>
-                <textarea id="migMsg_${req.id}" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500" placeholder="🚨 Channel Relocation Alert: The community has migrated to a new backup channel..."></textarea>
+                <textarea id="migMsg_${req.id}" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500" placeholder="Channel Relocation Alert: The community has migrated to a new backup channel..."></textarea>
               </div>
 
               <div>
                 <label class="block text-[10px] font-medium text-slate-400 mb-1">Inline Button Label</label>
-                <input type="text" id="migBtn_${req.id}" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500" value="📢 Join New Backup Channel">
+                <input type="text" id="migBtn_${req.id}" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500" value="Join New Backup Channel">
               </div>
 
               <div class="flex items-center gap-2 pt-1 border-t border-slate-800/80">
                 <button type="button" onclick="testMigrationDm(${req.id})" class="py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-xl text-[11px] font-semibold border border-slate-700 transition-all active:scale-95">
-                  🧪 Test DM
+                  Test DM
                 </button>
                 <button type="button" onclick="handleMigration(${req.id}, 'approve')" class="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[11px] font-semibold transition-all active:scale-95 shadow-sm">
                   Approve & Dispatch
@@ -1850,12 +2191,12 @@
         const result = await res.json();
         if (result.success) {
           tg?.HapticFeedback?.notificationOccurred("success");
-          alert("🧪 Test migration DM delivered to your private Telegram chat!");
+          alert("Test migration DM delivered to your private Telegram chat.");
         } else {
           alert("Test DM failed: " + (result.error || ""));
         }
       } catch (e) {
-        alert("Failed to communicate with bot.");
+        alert("Communication error.");
       }
     };
 
@@ -1880,7 +2221,7 @@
         const result = await res.json();
         if (result.success) {
           if (action === "approve") {
-            alert(`Migration authorized! Scheduled for ${result.dispatched} subscribers via FloodGuard.`);
+            alert(`Migration authorized for ${result.dispatched} subscribers.`);
             refreshLiveJobs();
           } else {
             alert("Migration request rejected.");
@@ -1897,7 +2238,7 @@
     // Export CSV
     exportCsvBtn.addEventListener("click", async () => {
       exportCsvBtn.disabled = true;
-      exportCsvBtn.innerHTML = `<span class="text-xs">Dispatching...</span>`;
+      exportCsvBtn.innerText = "Dispatching...";
 
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/export-subscribers-csv/${user.id}?t=${Date.now()}`, {
@@ -1907,15 +2248,15 @@
         const result = await res.json();
         if (result.success) {
           tg?.HapticFeedback?.notificationOccurred("success");
-          alert(`📁 ${result.message}\n(${result.count} unique subscribers)`);
+          alert(`${result.message}\n(${result.count} unique subscribers)`);
         } else {
           alert("CSV export failed: " + (result.detail || ""));
         }
       } catch (err) {
-        alert("Failed to trigger CSV delivery. Check server status.");
+        alert("Failed to trigger CSV delivery.");
       } finally {
         exportCsvBtn.disabled = false;
-        exportCsvBtn.innerHTML = `<span class="text-base">📥</span> Export CSV`;
+        exportCsvBtn.innerText = "Export CSV";
       }
     });
 
@@ -1942,13 +2283,13 @@
         const result = await res.json();
         if (result.success) {
           tg?.HapticFeedback?.notificationOccurred("success");
-          alert("Owner co-promotion rotation slots updated!");
+          alert("Owner co-promotion rotation slots updated.");
           loadOwnerDashboard();
         } else {
           alert("Failed to update slots: " + (result.error || ""));
         }
       } catch (e) {
-        alert("Network communication error.");
+        alert("Communication error.");
       } finally {
         savePromoSlotsBtn.disabled = false;
         savePromoSlotsBtn.innerText = "Save Promo Rotation Slots";
@@ -1972,7 +2313,7 @@
     };
 
     window.directMessageAdmin = async function(targetId) {
-      const msg = prompt(`Enter message to send directly to Admin (ID: ${targetId}):`);
+      const msg = prompt(`Enter message to send directly to Admin (ID: ${targetId}):\n\n(Tip: append /read at the end to attach a clean "Mark as read" button)`);
       if (!msg) return;
 
       try {
@@ -1983,16 +2324,15 @@
         });
         const result = await res.json();
         if (result.success) {
-          alert("Direct message delivered to admin.");
+          alert(result.read_receipt_enabled ? "Message delivered with 'Mark as read' confirmation button." : "Message delivered directly to admin.");
         } else {
           alert("Failed to send message: " + (result.error || ""));
         }
       } catch (e) {
-        alert("Network communication error.");
+        alert("Communication error.");
       }
     };
 
-    // Fixed Admin Broadcast Listener
     sendBroadcastBtn.addEventListener("click", async () => {
       const msg = broadcastInput.value.trim();
       if (!msg) return alert("Please enter an announcement.");
@@ -2014,7 +2354,7 @@
           alert("Broadcast failed: " + (result.error || result.detail || ""));
         }
       } catch (e) {
-        alert("Broadcast communication error.");
+        alert("Communication error.");
       } finally {
         sendBroadcastBtn.disabled = false;
         sendBroadcastBtn.innerText = "Dispatch Admin Broadcast";
@@ -2067,7 +2407,7 @@
         });
         const result = await res.json();
         if (result.success) {
-          alert("Global new community defaults updated!");
+          alert("Global new community defaults updated.");
           closeDefaultsModal();
         } else {
           alert("Error saving defaults.");
@@ -2080,22 +2420,69 @@
       }
     });
 
-    // Subscriber Broadcast Modal
-    openSubBroadcastBtn.addEventListener("click", () => subBroadcastModal.classList.remove("hidden"));
+    // Subscriber Broadcast Modal Functions
+    openSubBroadcastBtn.addEventListener("click", () => {
+      subBroadcastModal.classList.remove("hidden");
+      renderSubChannelChecklist();
+    });
     window.closeSubBroadcastModal = () => subBroadcastModal.classList.add("hidden");
 
-    broadTargetType.addEventListener("change", (e) => {
-      if (e.target.value === "channel") {
-        broadChannelSelectContainer.classList.remove("hidden");
+    window.setSubTargetType = function(type) {
+      subBroadcastTargetMode = type;
+      if (type === "all") {
+        btnSubTargetAll.className = "py-2 px-3 rounded-xl border border-amber-500/50 bg-amber-500/20 text-amber-300 font-semibold text-xs";
+        btnSubTargetCustom.className = "py-2 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 font-semibold text-xs";
+        subCustomChannelsContainer.classList.add("hidden");
       } else {
-        broadChannelSelectContainer.classList.add("hidden");
+        btnSubTargetCustom.className = "py-2 px-3 rounded-xl border border-amber-500/50 bg-amber-500/20 text-amber-300 font-semibold text-xs";
+        btnSubTargetAll.className = "py-2 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 font-semibold text-xs";
+        subCustomChannelsContainer.classList.remove("hidden");
+        recalcSubAudience();
       }
-    });
+    };
+
+    function renderSubChannelChecklist() {
+      subChannelChecklist.innerHTML = allOwnerChannels.map(ch => `
+        <label class="flex items-center justify-between p-1.5 rounded-lg bg-slate-900 border border-slate-800/80 cursor-pointer">
+          <span class="truncate text-slate-300 text-xs">${ch.chat_title}</span>
+          <input type="checkbox" value="${ch.chat_id}" onchange="recalcSubAudience()" class="sub-channel-box accent-amber-500 h-3.5 w-3.5">
+        </label>
+      `).join("");
+      subLiveAudienceReach.innerText = "0 unique users";
+    }
+
+    window.recalcSubAudience = async function() {
+      const selected = Array.from(document.querySelectorAll(".sub-channel-box:checked")).map(cb => Number(cb.value));
+      if (!selected.length) {
+        subLiveAudienceReach.innerText = "0 unique users";
+        return;
+      }
+      subLiveAudienceReach.innerText = "Calculating...";
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/owner/audience-count`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ admin_id: user.id, chat_ids: selected })
+        });
+        const data = await res.json();
+        if (data.success) {
+          subLiveAudienceReach.innerText = `${data.count.toLocaleString()} unique users`;
+        }
+      } catch (e) {
+        subLiveAudienceReach.innerText = "Error calculating";
+      }
+    };
 
     dispatchSubBroadcastBtn.addEventListener("click", async () => {
       const msg = broadMessageInput.value.trim();
       if (!msg) return alert("Please enter announcement message.");
-      if (!confirm("Dispatch broadcast to selected subscriber segment via FloodGuard?")) return;
+
+      const selected = Array.from(document.querySelectorAll(".sub-channel-box:checked")).map(cb => Number(cb.value));
+      if (subBroadcastTargetMode === "custom" && !selected.length) {
+        return alert("Please check at least one community.");
+      }
+
+      if (!confirm("Dispatch broadcast via FloodGuard?")) return;
 
       dispatchSubBroadcastBtn.disabled = true;
       dispatchSubBroadcastBtn.innerText = "Enqueuing broadcast...";
@@ -2105,8 +2492,8 @@
         message: msg,
         button_text: broadBtnText.value.trim() || null,
         button_url: broadBtnUrl.value.trim() || null,
-        target_type: broadTargetType.value,
-        target_chat_id: broadTargetType.value === "channel" ? Number(broadChannelSelect.value) : null
+        target_type: subBroadcastTargetMode,
+        target_chat_ids: subBroadcastTargetMode === "custom" ? selected : null
       };
 
       try {
@@ -2117,7 +2504,7 @@
         });
         const result = await res.json();
         if (result.success) {
-          alert(`Broadcast enqueued for ${result.queued} subscribers! Live progress will track in Owner HQ.`);
+          alert(`Broadcast enqueued for ${result.queued} subscribers.`);
           broadMessageInput.value = "";
           broadBtnText.value = "";
           broadBtnUrl.value = "";
