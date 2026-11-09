@@ -3,6 +3,7 @@ import json
 import csv
 import io
 import random
+import re
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
@@ -29,6 +30,7 @@ from telegram.ext import (
     ChatMemberHandler,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     ContextTypes,
     filters
 )
@@ -53,7 +55,7 @@ BACKEND_URL = os.getenv("BACKEND_URL", "https://tg-auto-accept-bot.onrender.com"
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-app = FastAPI(title="God-Tier Auto-Accept Platform")
+app = FastAPI(title="Auto-Accept Platform")
 
 app.add_middleware(
     CORSMiddleware,
@@ -63,7 +65,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global Anti-Cache Middleware
 @app.middleware("http")
 async def add_cache_headers(request: Request, call_next):
     response = await call_next(request)
@@ -73,13 +74,12 @@ async def add_cache_headers(request: Request, call_next):
     return response
 
 # ============================================================================
-# KEEPALIVE & HEALTH CHECK ENDPOINTS (FOR CRON-JOB.ORG)
+# HEALTH & KEEP-ALIVE ENDPOINTS
 # ============================================================================
 @app.get("/")
 @app.get("/health")
 @app.get("/ping")
 async def health_check():
-    """Returns 200 OK for cron-job.org and keepalive monitors."""
     return {
         "status": "online",
         "service": "Auto Request Acceptor Platform",
@@ -88,20 +88,17 @@ async def health_check():
 
 floodguard_queue: asyncio.Queue = asyncio.Queue()
 
-# ============================================================================
-# BACKGROUND KEEPALIVE & WORKERS
-# ============================================================================
 async def keepalive_worker():
-    """Pings backend health route every 9 minutes to prevent Render free tier sleep."""
+    """Pings backend health route every 9 minutes to prevent Render from idling."""
     await asyncio.sleep(15)
     async with httpx.AsyncClient(timeout=10.0) as client:
         while True:
             try:
                 await client.get(f"{BACKEND_URL}/health")
-                logger.info("Keepalive ping delivered to keep server active.")
+                logger.info("Keepalive ping delivered.")
             except Exception as e:
-                logger.warning(f"Keepalive ping notice: {e}")
-            await asyncio.sleep(540)  # 9 minutes
+                logger.warning(f"Keepalive notice: {e}")
+            await asyncio.sleep(540)
 
 async def floodguard_worker(tg_app: Application):
     """Processes mass outbound broadcasts sequentially (~25 req/sec)."""
@@ -111,7 +108,7 @@ async def floodguard_worker(tg_app: Application):
         try:
             await func(*args, **kwargs)
         except Forbidden:
-            logger.info("FloodGuard: User blocked bot or chat deleted.")
+            logger.info("FloodGuard: Target blocked bot or chat deleted.")
         except BadRequest as e:
             logger.warning(f"FloodGuard BadRequest: {e}")
         except TelegramError as e:
@@ -128,7 +125,7 @@ async def floodguard_worker(tg_app: Application):
 async def get_system_channel_defaults() -> Dict[str, Any]:
     fallback = {
         "custom_message": "Welcome to {channel}! Your access request has been approved.",
-        "custom_btn_text": "📢 Official Channel",
+        "custom_btn_text": "Official Channel",
         "custom_btn_url": "",
         "custom_btn_2_text": "",
         "custom_btn_2_url": "",
@@ -155,8 +152,31 @@ async def get_promotion_portal_flag() -> bool:
         logger.error(f"Error fetching feature flags: {e}")
     return False
 
+async def get_promo_packages_config() -> Dict[str, Any]:
+    fallback = {
+        "slot_packages": [
+            {"id": "slot_7d", "title": "7 Days Dynamic Slot", "price": "₹299", "duration_days": 7, "click_limit": None},
+            {"id": "slot_14d", "title": "14 Days Dynamic Slot", "price": "₹499", "duration_days": 14, "click_limit": None},
+            {"id": "slot_30d", "title": "30 Days Dynamic Slot", "price": "₹899", "duration_days": 30, "click_limit": None},
+            {"id": "slot_500c", "title": "500 Verified Clicks", "price": "₹499", "duration_days": None, "click_limit": 500}
+        ],
+        "broadcast_packages": [
+            {"id": "broad_500", "title": "Targeted Reach (500 Subs)", "price": "₹299", "reach": 500},
+            {"id": "broad_1000", "title": "Targeted Reach (1,000 Subs)", "price": "₹499", "reach": 1000},
+            {"id": "broad_all", "title": "Full Network Vault Broadcast", "price": "₹999", "reach": "all"}
+        ],
+        "rules_notice": "Promotions are reviewed and verified by management before scheduling."
+    }
+    try:
+        res = supabase.table("system_config").select("value").eq("key", "promo_packages_config").execute()
+        if res.data and len(res.data) > 0:
+            return res.data[0]["value"]
+    except Exception as e:
+        logger.error(f"Error fetching promo packages: {e}")
+    return fallback
+
 # ============================================================================
-# HORIZON ANALYTICS & CLICK STATS
+# HORIZON STATS & CLICK ANALYTICS
 # ============================================================================
 def compute_horizon_stats(chat_id: Optional[int] = None) -> Dict[str, int]:
     now = datetime.now(timezone.utc)
@@ -182,7 +202,7 @@ def compute_horizon_stats(chat_id: Optional[int] = None) -> Dict[str, int]:
         stats["joins_90d"] = q_90d.execute().count or 0
         stats["subscriber_count"] = q_all.execute().count or 0
     except Exception as e:
-        logger.error(f"Error calculating horizon stats: {e}")
+        logger.error(f"Error calculating stats: {e}")
 
     return stats
 
@@ -200,12 +220,25 @@ def compute_slot_clicks(slot_id: int) -> Dict[str, int]:
         clicks["clicks_30d"] = supabase.table("promo_clicks").select("*", count="exact", head=True).eq("slot_id", slot_id).gte("clicked_at", t_30d).execute().count or 0
         clicks["clicks_90d"] = supabase.table("promo_clicks").select("*", count="exact", head=True).eq("slot_id", slot_id).gte("clicked_at", t_90d).execute().count or 0
     except Exception as e:
-        logger.error(f"Error computing clicks for slot {slot_id}: {e}")
+        logger.error(f"Error computing slot clicks: {e}")
     return clicks
 
 # ============================================================================
-# REDIRECT ENGINE WITH TELEMETRY TRACKER
+# MEDIA PREVIEW PROXY & PROMO REDIRECT ENGINE
 # ============================================================================
+@app.get("/api/media/preview/{file_id}")
+async def get_media_preview(file_id: str):
+    """Resolves Telegram file_id to direct CDN URL so web browsers can render it."""
+    if not tg_application:
+        raise HTTPException(status_code=503, detail="Bot engine offline")
+    try:
+        tg_file = await tg_application.bot.get_file(file_id)
+        file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{tg_file.file_path}"
+        return RedirectResponse(url=file_url, status_code=307)
+    except Exception as e:
+        logger.warning(f"Could not resolve file preview for {file_id}: {e}")
+        raise HTTPException(status_code=404, detail="Media file not found")
+
 @app.get("/r/{slot_id}")
 async def redirect_promo_slot(slot_id: int, request: Request, u: Optional[int] = None):
     try:
@@ -232,15 +265,15 @@ async def redirect_promo_slot(slot_id: int, request: Request, u: Optional[int] =
                 "total_clicks": (slot.get("total_clicks") or 0) + 1
             }).eq("slot_id", slot_id).execute()
         except Exception as e:
-            logger.error(f"Failed to record promo click: {e}")
+            logger.error(f"Error logging click: {e}")
 
         return RedirectResponse(url=destination, status_code=302)
     except Exception as e:
-        logger.error(f"Error in redirect handler: {e}")
+        logger.error(f"Error in redirect engine: {e}")
         return RedirectResponse(url="https://t.me", status_code=302)
 
 # ============================================================================
-# TELEGRAM BOT HANDLERS
+# TELEGRAM BOT HANDLERS & TWO-WAY REPLY RELAY
 # ============================================================================
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args or []
@@ -250,8 +283,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_channel_id = args[0].replace("setbanner_", "")
         context.user_data["awaiting_banner_for"] = target_channel_id
         await update.message.reply_text(
-            f"📸 <b>Send the banner photo</b> you want to attach for channel ID: <code>{target_channel_id}</code>.\n\n"
-            "The photo will be saved on Telegram's CDN and linked instantly.",
+            f"Send the banner photo you want to attach for channel ID: <code>{target_channel_id}</code>.\n\n"
+            "The image will be linked automatically.",
             parse_mode="HTML"
         )
         return
@@ -259,18 +292,15 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if args and args[0].startswith("removebanner_"):
         target_channel_id = args[0].replace("removebanner_", "")
         supabase.table("channels").update({"banner_file_id": None}).eq("chat_id", int(target_channel_id)).execute()
-        await update.message.reply_text(
-            "✅ <b>Photo banner removed.</b> Approval cards have reverted to text format.",
-            parse_mode="HTML"
-        )
+        await update.message.reply_text("Photo banner removed. Approval cards reverted to text format.")
         return
 
     if args and args[0].startswith("setadphoto_"):
         target_user_id = args[0].replace("setadphoto_", "")
         context.user_data["awaiting_ad_photo_for"] = target_user_id
         await update.message.reply_text(
-            "📸 <b>Send the photo</b> you want to attach to your promotional broadcast.\n\n"
-            "The photo will be saved on Telegram's CDN and linked to your ad draft.",
+            "Send the photo you want to attach to your promotional broadcast.\n\n"
+            "The photo will be saved to your ad draft.",
             parse_mode="HTML"
         )
         return
@@ -278,24 +308,19 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if args and args[0].startswith("removeadphoto_"):
         target_user_id = int(args[0].replace("removeadphoto_", ""))
         supabase.table("ad_drafts").delete().eq("user_id", target_user_id).execute()
-        await update.message.reply_text(
-            "✅ <b>Promotional banner photo removed from draft.</b>",
-            parse_mode="HTML"
-        )
+        await update.message.reply_text("Promotional banner photo removed from draft.")
         return
 
     welcome_text = (
-        f"⚡ <b>Auto Request Acceptor Platform</b>\n\n"
-        f"Hello {user.first_name}! This bot provides automated, instant join-request processing "
-        f"with custom branded DMs and analytics.\n\n"
-        f"<b>Quick Setup:</b>\n"
-        f"1. Add @{context.bot.username} as an <b>Administrator</b> in your channel or group with <i>Invite Users</i> permission.\n"
+        f"<b>Auto Request Acceptor Platform</b>\n\n"
+        f"Hello {user.first_name}. Automated join-request processing with custom approval cards and analytics.\n\n"
+        f"<b>Setup:</b>\n"
+        f"1. Add @{context.bot.username} as an <b>Administrator</b> in your channel with <i>Invite Users</i> enabled.\n"
         f"2. Generate an invite link with <b>Request Admin Approval</b> turned ON.\n"
-        f"3. Use the <b>⚡ Open Dashboard</b> button below to configure your welcome cards."
+        f"3. Use the button below to manage settings."
     )
-    
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⚡ Open Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
+        [InlineKeyboardButton("Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
     ])
     await update.message.reply_text(welcome_text, parse_mode="HTML", reply_markup=keyboard)
 
@@ -306,28 +331,23 @@ async def cmd_mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     channels = res.data or []
 
     if not channels:
-        await update.message.reply_text(
-            "📊 <b>No Communities Connected</b>\n\n"
-            "You haven't added this bot to any channels yet. Promote the bot to Administrator in your channel or group to begin.",
-            parse_mode="HTML"
-        )
+        await update.message.reply_text("No connected channels found. Add the bot as an admin to get started.")
         return
 
-    text = "📊 <b>Your Channel & Group Performance:</b>\n\n"
+    text = "<b>Your Performance Metrics:</b>\n\n"
     for ch in channels:
         h = compute_horizon_stats(ch["chat_id"])
-        status = "🟢 Active" if ch.get("is_active", True) else "🔴 Paused"
+        status = "Active" if ch.get("is_active", True) else "Paused"
         text += (
-            f"📢 <b>{ch['chat_title']}</b>\n"
-            f"• Last 24 Hours: <b>+{h['joins_24h']}</b>\n"
-            f"• Last 30 Days: <b>{h['joins_30d']}</b>\n"
-            f"• Last 90 Days: <b>{h['joins_90d']}</b>\n"
-            f"• Logged Subscribers: <b>{h['subscriber_count']}</b>\n"
+            f"<b>{ch['chat_title']}</b>\n"
+            f"• 24h Joins: <b>+{h['joins_24h']}</b>\n"
+            f"• 30d Joins: <b>{h['joins_30d']}</b>\n"
+            f"• 90d Joins: <b>{h['joins_90d']}</b>\n"
+            f"• Reachable Subscribers: <b>{h['subscriber_count']}</b>\n"
             f"• Status: {status}\n\n"
         )
-
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⚡ Open Full Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
+        [InlineKeyboardButton("Open Full Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
     ])
     await update.message.reply_text(text, parse_mode="HTML", reply_markup=keyboard)
 
@@ -346,13 +366,11 @@ async def handle_banner_photo(update: Update, context: ContextTypes.DEFAULT_TYPE
             "updated_at": datetime.now(timezone.utc).isoformat()
         }).execute()
         del context.user_data["awaiting_ad_photo_for"]
-
         await update.message.reply_text(
-            "✅ <b>Promotional photo attached!</b>\n\n"
-            "Return to the <b>Promote</b> tab in your dashboard to test and submit your broadcast.",
-            parse_mode="HTML",
+            "Promotional photo attached.\n\n"
+            "Return to the Promote tab in your dashboard to preview and submit.",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("⚡ Open Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
+                [InlineKeyboardButton("Open Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
             ])
         )
         return
@@ -361,22 +379,17 @@ async def handle_banner_photo(update: Update, context: ContextTypes.DEFAULT_TYPE
     if target_channel_id:
         ch = supabase.table("channels").select("*").eq("chat_id", int(target_channel_id)).execute()
         if not ch.data:
-            await update.message.reply_text("❌ Channel record not found.")
+            await update.message.reply_text("Channel record not found.")
             return
 
         channel_record = ch.data[0]
         if user_id != OWNER_ID and int(channel_record.get("admin_id", 0)) != user_id:
-            await update.message.reply_text("❌ Unauthorized: You do not own this channel.")
+            await update.message.reply_text("Unauthorized: You do not own this channel.")
             return
 
         supabase.table("channels").update({"banner_file_id": photo_file_id}).eq("chat_id", int(target_channel_id)).execute()
         del context.user_data["awaiting_banner_for"]
-
-        await update.message.reply_text(
-            "✅ <b>Photo banner attached successfully!</b>\n"
-            "Your upcoming approval cards will include this banner photo.",
-            parse_mode="HTML"
-        )
+        await update.message.reply_text("Photo banner attached. Approval cards will now include this banner.")
 
 
 async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -406,15 +419,10 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
             try:
                 await context.bot.send_message(
                     chat_id=chat.id,
-                    text=(
-                        "👋 <b>Thanks for adding me!</b>\n\n"
-                        "To activate instant join-request approvals, please **promote this bot to Administrator** "
-                        "with the <i>Invite Users via Link</i> permission enabled."
-                    ),
-                    parse_mode="HTML"
+                    text="To activate instant approvals, promote this bot to Administrator with 'Invite Users via Link' enabled."
                 )
-            except Exception as e:
-                logger.info(f"Could not send member prompt in group {chat.id}: {e}")
+            except Exception:
+                pass
         return
 
     if new_status == "administrator":
@@ -423,17 +431,10 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
                 supabase.table("channels").update({"is_active": False}).eq("chat_id", chat.id).execute()
                 await context.bot.send_message(
                     chat_id=effective_admin_id,
-                    text=(
-                        f"⚠️ <b>Permission Revoked: {chat.title}</b>\n\n"
-                        f"• Type: <b>{chat.type.capitalize()}</b>\n"
-                        f"• Channel ID: <code>{chat.id}</code>\n\n"
-                        "The <b>'Invite Users via Link'</b> permission was removed from the bot. "
-                        "Auto-accept has been <b>paused</b> for this community until permission is re-enabled."
-                    ),
-                    parse_mode="HTML"
+                    text=f"Permission Revoked: 'Invite Users via Link' was removed for {chat.title}. Auto-accept is paused."
                 )
-            except Exception as e:
-                logger.error(f"Error handling invite revocation for {chat.id}: {e}")
+            except Exception:
+                pass
             return
 
         if not new_can_invite:
@@ -441,15 +442,10 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
                 supabase.table("channels").update({"is_active": False}).eq("chat_id", chat.id).execute()
                 await context.bot.send_message(
                     chat_id=effective_admin_id,
-                    text=(
-                        f"⚠️ <b>Action Required: {chat.title}</b>\n\n"
-                        "The bot was made an Administrator, but the <b>'Invite Users via Link'</b> permission is disabled.\n\n"
-                        "👉 Edit the bot's admin rights and toggle <b>Invite Users via Link ON</b> to activate auto-approvals."
-                    ),
-                    parse_mode="HTML"
+                    text=f"Action Required: Enable 'Invite Users via Link' for {chat.title} to start auto-accept."
                 )
-            except Exception as e:
-                logger.error(f"Error prompting for invite permission in {chat.id}: {e}")
+            except Exception:
+                pass
             return
 
         if old_status == "administrator" and old_can_invite == new_can_invite:
@@ -459,12 +455,12 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
         try:
             invite_obj = await context.bot.create_chat_invite_link(
                 chat_id=chat.id,
-                name="⚡ AutoAccept Magic Link",
+                name="AutoAccept Magic Link",
                 creates_join_request=True
             )
             magic_link = invite_obj.invite_link
         except Exception as e:
-            logger.warning(f"Could not auto-generate magic link for {chat.id}: {e}")
+            logger.warning(f"Could not auto-generate magic link: {e}")
 
         try:
             existing = supabase.table("channels").select("chat_id").eq("chat_id", chat.id).execute()
@@ -476,7 +472,7 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
                     "admin_id": effective_admin_id,
                     "admin_username": effective_username,
                     "custom_message": defaults.get("custom_message"),
-                    "custom_btn_text": defaults.get("custom_btn_text", "📢 Official Link"),
+                    "custom_btn_text": defaults.get("custom_btn_text", "Official Link"),
                     "custom_btn_url": magic_link or defaults.get("custom_btn_url", ""),
                     "custom_btn_2_text": defaults.get("custom_btn_2_text", ""),
                     "custom_btn_2_url": defaults.get("custom_btn_2_url", ""),
@@ -497,57 +493,32 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
                     update_data["custom_btn_url"] = magic_link
                 supabase.table("channels").update(update_data).eq("chat_id", chat.id).execute()
         except Exception as e:
-            logger.error(f"Error persisting channel {chat.id} to Supabase: {e}")
-
-        confirmation_text = (
-            f"✅ <b>Successfully Connected to {chat.title}!</b>\n\n"
-            f"• Type: <b>{chat.type.capitalize()}</b>\n"
-            f"• Chat ID: <code>{chat.id}</code>\n"
-            f"• Auto-Accept Engine: <b>Active</b>\n"
-            f"• Magic Link: {magic_link if magic_link else '<i>Use existing join-request link</i>'}\n\n"
-            f"Tap below to configure welcome copy and smart buttons:"
-        )
+            logger.error(f"Error saving channel record: {e}")
 
         try:
             await context.bot.send_message(
                 chat_id=effective_admin_id,
-                text=confirmation_text,
+                text=(
+                    f"Connected to <b>{chat.title}</b>.\n"
+                    f"Auto-accept is active. Configure welcome copy in dashboard:"
+                ),
                 parse_mode="HTML",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("⚡ Open Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
+                    [InlineKeyboardButton("Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
                 ])
             )
-        except Exception as e:
-            logger.info(f"Could not send DM to admin {effective_admin_id}: {e}")
-
-        if chat.type in ["group", "supergroup"]:
-            try:
-                await context.bot.send_message(
-                    chat_id=chat.id,
-                    text=(
-                        f"⚡ <b>Auto Request Acceptor Activated!</b>\n\n"
-                        f"This group is now monitored. New members requesting access via join links "
-                        f"will receive customized welcome cards and automated instant approvals."
-                    ),
-                    parse_mode="HTML"
-                )
-            except Exception as e:
-                logger.info(f"Could not send confirmation to group {chat.id}: {e}")
+        except Exception:
+            pass
 
     elif new_status in ["left", "kicked"] and old_status == "administrator":
         try:
             supabase.table("channels").update({"is_active": False}).eq("chat_id", chat.id).execute()
             await context.bot.send_message(
                 chat_id=effective_admin_id,
-                text=(
-                    f"⚠️ <b>Community Alert: {chat.title}</b>\n\n"
-                    "The bot's administrator rights have been revoked. "
-                    "Auto-approval has been paused for this community."
-                ),
-                parse_mode="HTML"
+                text=f"Bot removed or demoted in {chat.title}. Auto-accept paused."
             )
-        except Exception as e:
-            logger.info(f"Could not alert on demotion: {e}")
+        except Exception:
+            pass
 
 
 # ============================================================================
@@ -567,16 +538,15 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     # TIER 1: DUAL-ATTEMPT IMMEDIATE APPROVAL (< 50ms)
     try:
         await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user.id)
-        logger.info(f"⚡ Instant approved via bot method: {user.id} in {chat_id}")
+        logger.info(f"Instant approved: {user.id} in {chat_id}")
     except BadRequest as e:
         logger.info(f"Join request already handled: {e}")
-    except Exception as e:
-        logger.warning(f"Bot approve method failed, trying shortcut: {e}")
+    except Exception:
         try:
             await req.approve()
-            logger.info(f"⚡ Instant approved via shortcut: {user.id} in {chat_id}")
+            logger.info(f"Instant approved via shortcut: {user.id} in {chat_id}")
         except Exception as e2:
-            logger.error(f"Critical error on instant approve: {e2}")
+            logger.error(f"Error on instant approve: {e2}")
 
     # TIER 2: NON-BLOCKING WELCOME DM & TELEMETRY
     async def process_welcome_card():
@@ -610,14 +580,14 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
 
             final_text = (
-                f"🎉 <b>Request Approved for {channel_title}!</b>\n\n"
+                f"<b>Request Approved for {channel_title}</b>\n\n"
                 f"{formatted_msg}\n\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
-                f"⚡ <i>Auto-Approved via @{context.bot.username}</i>"
+                f"Auto-Approved via @{context.bot.username}"
             )
 
             keyboard_rows = []
-            btn1_text = channel.get("custom_btn_text") or f"📢 {channel_title}"
+            btn1_text = channel.get("custom_btn_text") or f"Enter {channel_title}"
             btn1_url = channel.get("custom_btn_url") or (invite_link.invite_link if invite_link else "https://t.me")
             keyboard_rows.append([InlineKeyboardButton(btn1_text, url=btn1_url)])
 
@@ -670,7 +640,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             except Forbidden:
                 logger.info(f"User {user.id} has blocked bot or disabled DMs.")
             except Exception as e:
-                logger.info(f"Could not deliver welcome DM to {user.id}: {e}")
+                logger.info(f"Could not deliver welcome DM: {e}")
 
             try:
                 supabase.table("join_logs").insert({
@@ -685,12 +655,137 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
                 logger.error(f"Error logging join record: {e}")
 
         except Exception as e:
-            logger.error(f"Unexpected error in background welcome process: {e}")
+            logger.error(f"Error in background welcome card: {e}")
 
     asyncio.create_task(process_welcome_card())
 
+
 # ============================================================================
-# FASTAPI LIFESPAN & ENGINE RUNNER
+# TWO-WAY DIRECT MESSAGE RELAY (OWNER <-> ADMINS)
+# ============================================================================
+async def handle_private_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg or not msg.text:
+        return
+
+    sender = update.effective_user
+    text = msg.text.strip()
+
+    # 1. OWNER REPLYING IN TELEGRAM TO AN ADMIN'S MESSAGE
+    if sender.id == OWNER_ID:
+        if msg.reply_to_message:
+            reply_id = msg.reply_to_message.message_id
+            relay_res = supabase.table("admin_message_relays").select("*").eq("owner_msg_id", reply_id).execute()
+            if relay_res.data and len(relay_res.data) > 0:
+                record = relay_res.data[0]
+                target_admin_id = record["admin_id"]
+
+                # Check for /read tag
+                wants_read_receipt = bool(re.search(r'(?i)\s*/read\b', text))
+                clean_text = re.sub(r'(?i)\s*/read\b', '', text).strip()
+
+                relay_insert = supabase.table("admin_message_relays").insert({
+                    "admin_id": target_admin_id,
+                    "owner_msg_id": msg.message_id,
+                    "direction": "owner_to_admin",
+                    "has_read_receipt": wants_read_receipt
+                }).execute()
+                new_relay_id = relay_insert.data[0]["id"] if relay_insert.data else 0
+
+                markup = None
+                if wants_read_receipt:
+                    markup = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("Mark as read", callback_data=f"read_{new_relay_id}")]
+                    ])
+
+                dm_text = (
+                    f"<b>Message from Management:</b>\n\n"
+                    f"{clean_text}\n\n"
+                    f"━━━━━━━━━━━━━━━━━━━\n"
+                    f"<i>Reply directly to this message to contact management.</i>"
+                )
+
+                try:
+                    sent = await context.bot.send_message(
+                        chat_id=target_admin_id,
+                        text=dm_text,
+                        parse_mode="HTML",
+                        reply_markup=markup
+                    )
+                    supabase.table("admin_message_relays").update({"admin_msg_id": sent.message_id}).eq("id", new_relay_id).execute()
+                    await msg.reply_text("Message delivered to admin.")
+                except Exception as e:
+                    await msg.reply_text(f"Could not deliver reply: {e}")
+                return
+
+    # 2. ADMIN MESSAGING OR REPLYING TO OWNER
+    else:
+        # Check if sender is registered in channels table
+        ch_check = supabase.table("channels").select("admin_id").eq("admin_id", sender.id).execute()
+        admin_channels = ch_check.data or []
+
+        sender_label = f"Admin {sender.first_name} (@{sender.username or 'NoUsername'})"
+        info_sub = f"ID: <code>{sender.id}</code> • Communities: <b>{len(admin_channels)}</b>"
+
+        owner_notice = (
+            f"<b>Message from {sender_label}</b>\n"
+            f"{info_sub}\n\n"
+            f"\"{text}\"\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"<i>Reply directly to this message to respond to this admin.</i>"
+        )
+
+        try:
+            sent_to_owner = await context.bot.send_message(
+                chat_id=OWNER_ID,
+                text=owner_notice,
+                parse_mode="HTML"
+            )
+            supabase.table("admin_message_relays").insert({
+                "admin_id": sender.id,
+                "owner_msg_id": sent_to_owner.message_id,
+                "admin_msg_id": msg.message_id,
+                "direction": "admin_to_owner"
+            }).execute()
+            await msg.reply_text("Your message has been delivered to management.")
+        except Exception as e:
+            logger.error(f"Error relaying admin message: {e}")
+
+
+async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    if not query or not query.data:
+        return
+
+    data = query.data
+    user = query.from_user
+
+    if data.startswith("read_"):
+        relay_id = int(data.replace("read_", ""))
+        await query.answer("Marked as read.")
+
+        try:
+            supabase.table("admin_message_relays").update({
+                "has_read_receipt": True,
+                "read_at": datetime.now(timezone.utc).isoformat()
+            }).eq("id", relay_id).execute()
+
+            # Remove button on admin side cleanly without adding emojis
+            await query.edit_message_reply_markup(reply_markup=None)
+
+            # Notify owner
+            notice_text = (
+                f"<b>Read Confirmation</b>\n\n"
+                f"Admin {user.first_name} (@{user.username or user.id}) marked your message as read.\n"
+                f"Time: <code>{datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}</code>"
+            )
+            await context.bot.send_message(chat_id=OWNER_ID, text=notice_text, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Error handling read callback: {e}")
+
+
+# ============================================================================
+# FASTAPI LIFESPAN & ENGINE INITIALIZATION
 # ============================================================================
 tg_application: Optional[Application] = None
 
@@ -709,15 +804,16 @@ async def startup_event():
     tg_application.add_handler(ChatMemberHandler(chat_member_update_handler, ChatMemberHandler.MY_CHAT_MEMBER))
     tg_application.add_handler(ChatJoinRequestHandler(handle_join_request))
     tg_application.add_handler(MessageHandler(filters.PHOTO, handle_banner_photo))
+    tg_application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_private_message))
+    tg_application.add_handler(CallbackQueryHandler(handle_callback_query))
 
     await tg_application.initialize()
     await tg_application.start()
 
     try:
         await tg_application.bot.delete_webhook(drop_pending_updates=False)
-        logger.info("Cleared previous webhook status.")
-    except Exception as e:
-        logger.warning(f"Notice deleting webhook: {e}")
+    except Exception:
+        pass
 
     await tg_application.updater.start_polling(
         drop_pending_updates=False,
@@ -726,7 +822,7 @@ async def startup_event():
 
     try:
         await tg_application.bot.set_chat_menu_button(
-            menu_button=MenuButtonWebApp(text="⚡ Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))
+            menu_button=MenuButtonWebApp(text="Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))
         )
         await tg_application.bot.set_my_commands([
             BotCommand("start", "Launch bot & onboarding guide"),
@@ -819,10 +915,23 @@ class PromotionActionPayload(BaseModel):
     assigned_slot_id: Optional[int] = 1
     expires_in_days: Optional[int] = 7
     click_limit: Optional[int] = None
+    target_chat_ids: Optional[List[int]] = None
+
+class PromoOwnerTestPreviewPayload(BaseModel):
+    admin_id: int
+    application_id: int
+
+class AudienceCountQueryPayload(BaseModel):
+    admin_id: int
+    chat_ids: List[int]
 
 class SystemFlagsUpdatePayload(BaseModel):
     admin_id: int
     promotion_portal_enabled: bool
+
+class PromoPackagesConfigPayload(BaseModel):
+    admin_id: int
+    config: Dict[str, Any]
 
 class PromoSlotItem(BaseModel):
     slot_id: int
@@ -874,10 +983,10 @@ class SubscriberBroadcastPayload(BaseModel):
     button_text: Optional[str] = None
     button_url: Optional[str] = None
     target_type: str = "all"
-    target_chat_id: Optional[int] = None
+    target_chat_ids: Optional[List[int]] = None
 
 # ============================================================================
-# API ROUTES: SYSTEM FLAGS
+# API ROUTES: SYSTEM CONFIG & PROMO PACKAGES
 # ============================================================================
 def verify_owner(admin_id: int):
     if int(admin_id) != OWNER_ID:
@@ -886,25 +995,38 @@ def verify_owner(admin_id: int):
 @app.get("/api/system/flags")
 async def get_public_system_flags():
     enabled = await get_promotion_portal_flag()
-    return {
-        "success": True,
-        "promotion_portal_enabled": enabled
-    }
+    return {"success": True, "promotion_portal_enabled": enabled}
 
 @app.post("/api/owner/system/flags")
 async def update_system_flags(payload: SystemFlagsUpdatePayload):
     verify_owner(payload.admin_id)
     try:
-        flags_value = {"promotion_portal_enabled": payload.promotion_portal_enabled}
         supabase.table("system_config").upsert({
             "key": "feature_flags",
-            "value": flags_value,
+            "value": {"promotion_portal_enabled": payload.promotion_portal_enabled},
             "updated_at": datetime.now(timezone.utc).isoformat()
         }).execute()
-
         return {"success": True, "promotion_portal_enabled": payload.promotion_portal_enabled}
     except Exception as e:
-        logger.error(f"Error saving system flags: {e}")
+        logger.error(f"Error saving flags: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/system/promo-packages")
+async def get_public_promo_packages():
+    config = await get_promo_packages_config()
+    return {"success": True, "packages": config}
+
+@app.post("/api/owner/system/promo-packages")
+async def save_owner_promo_packages(payload: PromoPackagesConfigPayload):
+    verify_owner(payload.admin_id)
+    try:
+        supabase.table("system_config").upsert({
+            "key": "promo_packages_config",
+            "value": payload.config,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }).execute()
+        return {"success": True, "message": "Packages updated successfully."}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================================
@@ -924,14 +1046,9 @@ async def get_admin_channels(admin_id: int):
             ch["joins_90d"] = h_stats["joins_90d"]
             ch["subscriber_count"] = h_stats["subscriber_count"]
 
-        return {
-            "success": True,
-            "is_owner": is_owner,
-            "channels": channels
-        }
+        return {"success": True, "is_owner": is_owner, "channels": channels}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.post("/api/channel/create-magic-link")
 async def create_magic_link_api(payload: MagicLinkCreatePayload):
@@ -953,9 +1070,7 @@ async def create_magic_link_api(payload: MagicLinkCreatePayload):
         )
         return {"success": True, "invite_link": invite_obj.invite_link, "name": name}
     except Exception as e:
-        logger.error(f"Failed to generate magic link: {e}")
         return {"success": False, "error": str(e)}
-
 
 @app.post("/api/channel/update")
 async def update_channel_config(payload: ChannelUpdatePayload):
@@ -963,7 +1078,6 @@ async def update_channel_config(payload: ChannelUpdatePayload):
         ch = supabase.table("channels").select("admin_id").eq("chat_id", payload.chat_id).execute()
         if not ch.data:
             raise HTTPException(status_code=404, detail="Channel not found")
-        
         if payload.admin_id != OWNER_ID and int(ch.data[0]["admin_id"]) != payload.admin_id:
             raise HTTPException(status_code=403, detail="Unauthorized")
 
@@ -982,7 +1096,6 @@ async def update_channel_config(payload: ChannelUpdatePayload):
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.post("/api/channel/test-dm")
 async def send_test_dm(payload: TestDmPayload):
@@ -1004,11 +1117,11 @@ async def send_test_dm(payload: TestDmPayload):
     formatted = msg.replace("{name}", "Admin").replace("{channel}", channel_title).replace("{username}", "@Admin").replace("{time}", "12:00 UTC")
 
     text = (
-        f"🧪 <b>TEST PREVIEW: Approval Card</b>\n\n"
-        f"🎉 <b>Request Approved for {channel_title}!</b>\n\n"
+        f"<b>TEST PREVIEW: Approval Card</b>\n\n"
+        f"<b>Request Approved for {channel_title}</b>\n\n"
         f"{formatted}\n\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"⚡ <i>Auto-Approved via @{tg_application.bot.username}</i>"
+        f"Auto-Approved via @{tg_application.bot.username}"
     )
 
     rows = []
@@ -1039,7 +1152,6 @@ async def send_test_dm(payload: TestDmPayload):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
 @app.get("/api/channel/analytics/{chat_id}")
 async def get_channel_analytics(chat_id: int):
     try:
@@ -1060,7 +1172,6 @@ async def get_channel_analytics(chat_id: int):
         return {"success": True, "total_joins": total, "breakdown": breakdown}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.post("/api/channel/request-migration")
 async def request_channel_migration(payload: MigrationRequestPayload):
@@ -1084,7 +1195,6 @@ async def request_channel_migration(payload: MigrationRequestPayload):
 
         return {"success": True, "audience_count": len(users)}
     except Exception as e:
-        logger.error(f"Migration request error: {e}")
         return {"success": False, "error": str(e)}
 
 # ============================================================================
@@ -1100,7 +1210,6 @@ async def get_ad_draft_status(admin_id: int):
     except Exception as e:
         return {"success": False, "has_photo": False, "error": str(e)}
 
-
 @app.post("/api/promotion/ad-draft/clear/{admin_id}")
 async def clear_ad_draft_photo(admin_id: int):
     try:
@@ -1108,7 +1217,6 @@ async def clear_ad_draft_photo(admin_id: int):
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}
-
 
 @app.post("/api/promotion/test-dm")
 async def send_promo_test_preview(payload: PromoTestDmPayload):
@@ -1125,18 +1233,18 @@ async def send_promo_test_preview(payload: PromoTestDmPayload):
 
         if payload.promo_type == "broadcast":
             text = (
-                f"🧪 <b>TEST PREVIEW: Sponsored Broadcast</b>\n\n"
+                f"<b>TEST PREVIEW: Sponsored Broadcast</b>\n\n"
                 f"{payload.broadcast_message or 'Sponsored announcement text...'}\n\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
-                f"⚡ <i>Auto-Approved via @{tg_application.bot.username}</i>"
+                f"Auto-Approved via @{tg_application.bot.username}"
             )
         else:
             text = (
-                f"🧪 <b>TEST PREVIEW: Welcome Card Slot</b>\n\n"
-                f"🎉 <b>Request Approved for {payload.community_name or 'Sample Channel'}!</b>\n\n"
+                f"<b>TEST PREVIEW: Welcome Card Slot</b>\n\n"
+                f"<b>Request Approved for {payload.community_name or 'Sample Channel'}</b>\n\n"
                 f"Welcome! Your request has been approved.\n\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
-                f"⚡ <i>Auto-Approved via @{tg_application.bot.username}</i>"
+                f"Auto-Approved via @{tg_application.bot.username}"
             )
 
         if banner_file_id and payload.promo_type == "broadcast":
@@ -1155,18 +1263,16 @@ async def send_promo_test_preview(payload: PromoTestDmPayload):
                 reply_markup=markup
             )
 
-        return {"success": True, "message": "Preview delivered to your private Telegram chat!"}
+        return {"success": True, "message": "Preview delivered to your Telegram chat."}
     except Exception as e:
-        logger.error(f"Error sending promo test preview: {e}")
         return {"success": False, "error": str(e)}
-
 
 @app.post("/api/promotion/apply")
 async def submit_promotion_application(payload: PromotionApplyPayload):
     try:
         enabled = await get_promotion_portal_flag()
         if not enabled:
-            raise HTTPException(status_code=400, detail="Promotion portal is currently disabled by Owner.")
+            raise HTTPException(status_code=400, detail="Promotion portal is currently disabled.")
 
         d_res = supabase.table("ad_drafts").select("banner_file_id").eq("user_id", payload.admin_id).execute()
         banner_file_id = d_res.data[0]["banner_file_id"] if (d_res.data and len(d_res.data) > 0) else None
@@ -1191,28 +1297,29 @@ async def submit_promotion_application(payload: PromotionApplyPayload):
         if tg_application:
             admin_disp = f"@{payload.admin_username.lstrip('@')}" if payload.admin_username else f"ID: {payload.admin_id}"
             type_disp = "Slot Promotion" if payload.promo_type == "slot" else "Direct DM Broadcast"
-            has_photo_tag = " [🖼️ Photo Attached]" if banner_file_id else ""
+            photo_tag = " [Photo Attached]" if banner_file_id else ""
             alert_text = (
-                f"📢 <b>NEW PROMOTION APPLICATION RECEIVED</b>\n\n"
-                f"• Type: <b>{type_disp}{has_photo_tag}</b>\n"
+                f"<b>New Promotion Application</b>\n\n"
+                f"• Type: <b>{type_disp}{photo_tag}</b>\n"
                 f"• Applicant: <b>{admin_disp}</b>\n"
                 f"• Campaign/Brand: {payload.community_name or 'N/A'}\n"
                 f"• Button: <code>{payload.button_text or 'N/A'}</code>\n"
                 f"• URL: <code>{payload.destination_url}</code>\n"
-                f"• Requested Package: <b>{payload.requested_duration}</b>\n\n"
-                f"👉 Open <b>⚡ Dashboard $\rightarrow$ Owner HQ</b> to review and schedule."
+                f"• Package: <b>{payload.requested_duration}</b>\n\n"
+                f"Review and schedule inside Owner HQ."
             )
             try:
                 await tg_application.bot.send_message(chat_id=OWNER_ID, text=alert_text, parse_mode="HTML")
-            except Exception as e:
-                logger.error(f"Could not notify owner of promo request: {e}")
+            except Exception:
+                pass
 
-        return {"success": True, "message": "Promotion application submitted successfully!"}
+        return {"success": True, "message": "Promotion application submitted."}
     except Exception as e:
-        logger.error(f"Error submitting promo application: {e}")
         return {"success": False, "error": str(e)}
 
-
+# ============================================================================
+# API ROUTES: OWNER HQ, PREVIEWS & TARGETING
+# ============================================================================
 @app.get("/api/owner/promotions/{admin_id}")
 async def get_owner_promotions(admin_id: int):
     verify_owner(admin_id)
@@ -1222,6 +1329,72 @@ async def get_owner_promotions(admin_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/owner/promotions/test-preview")
+async def owner_test_preview_ad(payload: PromoOwnerTestPreviewPayload):
+    """Sends exact rendered ad preview to owner chat for content inspection."""
+    verify_owner(payload.admin_id)
+    if not tg_application:
+        raise HTTPException(status_code=503, detail="Telegram engine offline")
+
+    try:
+        app_res = supabase.table("promotion_applications").select("*").eq("id", payload.application_id).execute()
+        if not app_res.data:
+            raise HTTPException(status_code=404, detail="Application not found")
+
+        appl = app_res.data[0]
+        markup = None
+        if appl.get("button_text") and appl.get("destination_url"):
+            markup = InlineKeyboardMarkup([[InlineKeyboardButton(appl["button_text"], url=appl["destination_url"])]])
+
+        if appl["promo_type"] == "broadcast":
+            text = (
+                f"<b>OWNER REVIEW: Broadcast Creative Preview</b>\n\n"
+                f"{appl.get('broadcast_message') or 'No message text provided.'}\n\n"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"Applicant: @{appl.get('admin_username') or appl.get('admin_id')} | Target: {appl.get('target_channel_title')}"
+            )
+        else:
+            text = (
+                f"<b>OWNER REVIEW: Welcome Card Slot Preview</b>\n\n"
+                f"<b>Request Approved for {appl.get('target_channel_title', 'Sample Community')}</b>\n\n"
+                f"Welcome! Your request has been approved.\n\n"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"Applicant: @{appl.get('admin_username') or appl.get('admin_id')} | Slot Destination: {appl.get('destination_url')}"
+            )
+
+        if appl.get("banner_file_id"):
+            await tg_application.bot.send_photo(
+                chat_id=OWNER_ID,
+                photo=appl["banner_file_id"],
+                caption=text,
+                parse_mode="HTML",
+                reply_markup=markup
+            )
+        else:
+            await tg_application.bot.send_message(
+                chat_id=OWNER_ID,
+                text=text,
+                parse_mode="HTML",
+                reply_markup=markup
+            )
+
+        return {"success": True, "message": "Preview delivered to your Telegram DM."}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/owner/audience-count")
+async def calculate_audience_count(payload: AudienceCountQueryPayload):
+    """Calculates deduplicated unique audience count across selected channel IDs."""
+    verify_owner(payload.admin_id)
+    try:
+        if not payload.chat_ids:
+            return {"success": True, "count": 0}
+
+        q = supabase.table("join_logs").select("user_id").in_("chat_id", payload.chat_ids).execute()
+        unique_users = set(r["user_id"] for r in (q.data or []))
+        return {"success": True, "count": len(unique_users)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.post("/api/owner/promotions/action")
 async def handle_promotion_action(payload: PromotionActionPayload, background_tasks: BackgroundTasks):
@@ -1238,7 +1411,7 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
                 try:
                     await tg_application.bot.send_message(
                         chat_id=appl["admin_id"],
-                        text=f"❌ <b>Promotion Request Update</b>\n\nYour promotion application for <b>{appl['destination_url']}</b> was not approved at this time.",
+                        text=f"Promotion Update: Your application for <b>{appl['destination_url']}</b> was not approved.",
                         parse_mode="HTML"
                     )
                 except Exception:
@@ -1251,7 +1424,7 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
             
             supabase.table("promo_slots").upsert({
                 "slot_id": assigned_slot,
-                "btn_text": appl.get("button_text") or "🔥 Sponsored",
+                "btn_text": appl.get("button_text") or "Sponsored",
                 "btn_url": appl["destination_url"],
                 "is_active": True,
                 "expires_at": expires_at,
@@ -1260,7 +1433,13 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
             }).execute()
 
         elif appl["promo_type"] == "broadcast":
-            res = supabase.table("view_unique_subscribers").select("user_id").execute()
+            if payload.target_chat_ids and len(payload.target_chat_ids) > 0:
+                res = supabase.table("join_logs").select("user_id").in_("chat_id", payload.target_chat_ids).execute()
+                segment_label = f"Selected ({len(payload.target_chat_ids)} Communities)"
+            else:
+                res = supabase.table("view_unique_subscribers").select("user_id").execute()
+                segment_label = "Global Vault"
+
             uids = list(set(r["user_id"] for r in (res.data or [])))
 
             if uids and tg_application:
@@ -1270,21 +1449,22 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
 
                 job_res = supabase.table("broadcast_jobs").insert({
                     "job_type": "paid_broadcast",
-                    "target_segment": f"Sponsored: {appl.get('target_channel_title', 'All')}",
+                    "target_segment": f"Sponsored: {appl.get('target_channel_title', 'Ad')} ({segment_label})",
                     "total_queued": len(uids),
                     "delivered_count": 0,
                     "blocked_count": 0,
                     "banner_file_id": appl.get("banner_file_id"),
+                    "target_chat_ids": payload.target_chat_ids or [],
                     "status": "processing",
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }).execute()
                 job_id = job_res.data[0]["id"] if job_res.data else None
 
-                b_msg = appl.get("broadcast_message") or f"📢 <b>Sponsored Announcement</b>\n\nVisit: {appl['destination_url']}"
+                b_msg = appl.get("broadcast_message") or f"Sponsored Announcement:\n\n{appl['destination_url']}"
                 banner_file_id = appl.get("banner_file_id")
 
-                async def enqueue_paid_broadcast(user_ids: List[int], msg_text: str, reply_markup, photo_id: Optional[str], j_id: Optional[int]):
+                async def enqueue_paid_broadcast(user_ids: List[int], msg_text: str, reply_markup, photo_id: Optional[str], j_id: Optional[int], target_info: str):
                     delivered = 0
                     blocked = 0
 
@@ -1336,34 +1516,33 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
                                 }).eq("id", j_id).execute()
                             except Exception:
                                 pass
+
+                            # Send Completion Report to Owner
+                            total_processed = delivered + blocked
+                            success_pct = round((delivered / total_processed * 100), 1) if total_processed > 0 else 0
+                            report = (
+                                f"<b>Broadcast Completed Report</b>\n\n"
+                                f"• Campaign: <b>{target_info}</b>\n"
+                                f"• Total Queued: <b>{len(user_ids)}</b>\n"
+                                f"• Delivered: <b>{delivered}</b>\n"
+                                f"• Blocked / Inactive: <b>{blocked}</b>\n"
+                                f"• Delivery Rate: <b>{success_pct}%</b>\n"
+                                f"• Completed At: <code>{datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}</code>"
+                            )
+                            try:
+                                await tg_application.bot.send_message(chat_id=OWNER_ID, text=report, parse_mode="HTML")
+                            except Exception:
+                                pass
+
                         await floodguard_queue.put((finalize_job, (), {}))
 
-                background_tasks.add_task(enqueue_paid_broadcast, uids, b_msg, markup, banner_file_id, job_id)
+                background_tasks.add_task(enqueue_paid_broadcast, uids, b_msg, markup, banner_file_id, job_id, appl.get("target_channel_title", "Campaign"))
 
         supabase.table("promotion_applications").update({"status": "approved"}).eq("id", payload.application_id).execute()
-
-        if tg_application:
-            try:
-                await tg_application.bot.send_message(
-                    chat_id=appl["admin_id"],
-                    text=(
-                        f"🎉 <b>Promotion Approved & Live!</b>\n\n"
-                        f"Your promotion request has been approved and scheduled.\n"
-                        f"• Target URL: <code>{appl['destination_url']}</code>"
-                    ),
-                    parse_mode="HTML"
-                )
-            except Exception:
-                pass
-
-        return {"success": True, "message": "Promotion approved and scheduled!"}
+        return {"success": True, "message": "Promotion approved and scheduled."}
     except Exception as e:
-        logger.error(f"Error handling promo action: {e}")
         return {"success": False, "error": str(e)}
 
-# ============================================================================
-# API ROUTES: OWNER HQ
-# ============================================================================
 @app.get("/api/owner/data/{admin_id}")
 async def get_owner_dashboard_data(admin_id: int):
     verify_owner(admin_id)
@@ -1403,7 +1582,6 @@ async def get_owner_dashboard_data(admin_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.get("/api/owner/broadcast-jobs/{admin_id}")
 async def get_broadcast_jobs_api(admin_id: int):
     verify_owner(admin_id)
@@ -1413,18 +1591,14 @@ async def get_broadcast_jobs_api(admin_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.post("/api/owner/broadcast-jobs/clear")
 async def clear_broadcast_jobs_api(payload: ClearJobsPayload):
-    """Clears past broadcast logs from the Live Delivery Sentinel."""
     verify_owner(payload.admin_id)
     try:
         supabase.table("broadcast_jobs").delete().neq("id", 0).execute()
         return {"success": True, "message": "Broadcast logs cleared."}
     except Exception as e:
-        logger.error(f"Error clearing broadcast jobs: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/api/owner/admins/{admin_id}")
 async def get_owner_admins(admin_id: int):
@@ -1442,7 +1616,7 @@ async def get_owner_admins(admin_id: int):
             if aid not in admins_map:
                 uname = c.get("admin_username")
                 if aid == OWNER_ID:
-                    disp_name = "Surendra (Master Owner)"
+                    disp_name = "Surendra (Owner)"
                 elif uname:
                     disp_name = f"@{uname.lstrip('@')}"
                 else:
@@ -1464,9 +1638,7 @@ async def get_owner_admins(admin_id: int):
 
         return {"success": True, "admins": list(admins_map.values())}
     except Exception as e:
-        logger.error(f"Error in get_owner_admins: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/api/owner/admin-detail/{admin_id}/{target_admin_id}")
 async def get_admin_inspection_detail(admin_id: int, target_admin_id: int):
@@ -1474,7 +1646,6 @@ async def get_admin_inspection_detail(admin_id: int, target_admin_id: int):
     try:
         res = supabase.table("channels").select("*").eq("admin_id", target_admin_id).execute()
         channels = res.data or []
-        
         for c in channels:
             c_stats = compute_horizon_stats(c["chat_id"])
             c["joins_24h"] = c_stats["joins_24h"]
@@ -1482,14 +1653,9 @@ async def get_admin_inspection_detail(admin_id: int, target_admin_id: int):
             c["joins_90d"] = c_stats["joins_90d"]
             c["subscriber_count"] = c_stats["subscriber_count"]
 
-        return {
-            "success": True,
-            "target_admin_id": target_admin_id,
-            "channels": channels
-        }
+        return {"success": True, "target_admin_id": target_admin_id, "channels": channels}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.post("/api/owner/channel/override")
 async def override_admin_channel(payload: ChannelOverridePayload):
@@ -1504,18 +1670,15 @@ async def override_admin_channel(payload: ChannelOverridePayload):
             "banner_file_id": payload.banner_file_id,
             "is_active": payload.is_active
         }).eq("chat_id", payload.target_chat_id).execute()
-
-        return {"success": True, "message": "Channel configuration updated by Owner."}
+        return {"success": True, "message": "Channel updated."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/api/owner/defaults/{admin_id}")
 async def get_channel_defaults_api(admin_id: int):
     verify_owner(admin_id)
     defaults = await get_system_channel_defaults()
     return {"success": True, "defaults": defaults}
-
 
 @app.post("/api/owner/defaults")
 async def save_channel_defaults_api(payload: ChannelDefaultsPayload):
@@ -1529,7 +1692,6 @@ async def save_channel_defaults_api(payload: ChannelDefaultsPayload):
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/api/owner/export-subscribers-csv/{admin_id}")
 async def export_subscribers_csv(admin_id: int):
@@ -1563,23 +1725,12 @@ async def export_subscribers_csv(admin_id: int):
         await tg_application.bot.send_document(
             chat_id=admin_id,
             document=doc,
-            caption=(
-                f"📁 <b>Audience Vault CSV Export</b>\n\n"
-                f"• Unique Subscribers: <b>{len(rows)}</b>\n"
-                f"• Generated: <code>{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}</code>"
-            ),
+            caption=f"Audience Vault CSV: {len(rows)} unique subscribers.",
             parse_mode="HTML"
         )
-
-        return {
-            "success": True,
-            "count": len(rows),
-            "message": "CSV delivered directly to your Telegram chat!"
-        }
+        return {"success": True, "count": len(rows), "message": "CSV delivered to your Telegram chat."}
     except Exception as e:
-        logger.error(f"Error generating CSV document: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.post("/api/owner/broadcast-subscribers")
 async def broadcast_subscribers(payload: SubscriberBroadcastPayload, background_tasks: BackgroundTasks):
@@ -1588,18 +1739,16 @@ async def broadcast_subscribers(payload: SubscriberBroadcastPayload, background_
         raise HTTPException(status_code=503, detail="Telegram engine offline")
 
     try:
-        if payload.target_type == "channel" and payload.target_chat_id:
-            res = supabase.table("join_logs").select("user_id").eq("chat_id", payload.target_chat_id).execute()
+        if payload.target_type == "custom" and payload.target_chat_ids and len(payload.target_chat_ids) > 0:
+            res = supabase.table("join_logs").select("user_id").in_("chat_id", payload.target_chat_ids).execute()
+            segment_label = f"Selected ({len(payload.target_chat_ids)} Communities)"
         else:
             res = supabase.table("view_unique_subscribers").select("user_id").execute()
+            segment_label = "Global Vault"
 
         user_ids = list(set(r["user_id"] for r in (res.data or [])))
         if not user_ids:
-            return {
-                "success": False,
-                "queued": 0,
-                "error": "This channel segment has 0 recorded subscribers in the vault. No messages were queued."
-            }
+            return {"success": False, "queued": 0, "error": "Selected audience has 0 recorded subscribers."}
 
         markup = None
         if payload.button_text and payload.button_url:
@@ -1607,17 +1756,18 @@ async def broadcast_subscribers(payload: SubscriberBroadcastPayload, background_
 
         job_res = supabase.table("broadcast_jobs").insert({
             "job_type": "subscriber_broadcast",
-            "target_segment": payload.target_type if payload.target_type == "all" else f"Channel {payload.target_chat_id}",
+            "target_segment": segment_label,
             "total_queued": len(user_ids),
             "delivered_count": 0,
             "blocked_count": 0,
+            "target_chat_ids": payload.target_chat_ids or [],
             "status": "processing",
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat()
         }).execute()
         job_id = job_res.data[0]["id"] if job_res.data else None
 
-        async def enqueue_broadcast_jobs(uids: List[int], text: str, reply_markup, j_id: Optional[int]):
+        async def enqueue_broadcast_jobs(uids: List[int], text: str, reply_markup, j_id: Optional[int], seg_name: str):
             delivered = 0
             blocked = 0
 
@@ -1660,20 +1810,29 @@ async def broadcast_subscribers(payload: SubscriberBroadcastPayload, background_
                         }).eq("id", j_id).execute()
                     except Exception:
                         pass
+
+                    total_processed = delivered + blocked
+                    rate = round((delivered / total_processed * 100), 1) if total_processed > 0 else 0
+                    report = (
+                        f"<b>Broadcast Completed Report</b>\n\n"
+                        f"• Target Segment: <b>{seg_name}</b>\n"
+                        f"• Total Queued: <b>{len(uids)}</b>\n"
+                        f"• Delivered: <b>{delivered}</b>\n"
+                        f"• Blocked / Inactive: <b>{blocked}</b>\n"
+                        f"• Delivery Rate: <b>{rate}%</b>\n"
+                        f"• Completed At: <code>{datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}</code>"
+                    )
+                    try:
+                        await tg_application.bot.send_message(chat_id=OWNER_ID, text=report, parse_mode="HTML")
+                    except Exception:
+                        pass
+
                 await floodguard_queue.put((finalize_job, (), {}))
 
-        background_tasks.add_task(enqueue_broadcast_jobs, user_ids, payload.message, markup, job_id)
-
-        return {
-            "success": True,
-            "queued": len(user_ids),
-            "target": payload.target_type,
-            "job_id": job_id,
-            "message": f"Broadcast enqueued for {len(user_ids)} subscribers via FloodGuard."
-        }
+        background_tasks.add_task(enqueue_broadcast_jobs, user_ids, payload.message, markup, job_id, segment_label)
+        return {"success": True, "queued": len(user_ids), "job_id": job_id, "message": f"Broadcast enqueued for {len(user_ids)} subscribers."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.post("/api/owner/promo-slots")
 async def update_promo_slots(payload: PromoSlotsUpdatePayload):
@@ -1700,7 +1859,6 @@ async def update_promo_slots(payload: PromoSlotsUpdatePayload):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.post("/api/owner/toggle-channel")
 async def toggle_channel_status(payload: ChannelTogglePayload):
     verify_owner(payload.admin_id)
@@ -1710,23 +1868,47 @@ async def toggle_channel_status(payload: ChannelTogglePayload):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.post("/api/owner/direct-message")
 async def direct_message_admin(payload: DirectMessagePayload):
+    """Sends message from owner to admin with support for the /read confirmation trigger."""
     verify_owner(payload.admin_id)
     if not tg_application:
         raise HTTPException(status_code=503, detail="Telegram engine offline")
     try:
-        msg = f"📩 <b>Platform Administrator Notice</b>\n\n{payload.message}"
-        await tg_application.bot.send_message(
-            chat_id=payload.target_admin_id,
-            text=msg,
-            parse_mode="HTML"
+        raw_text = payload.message.strip()
+        wants_read_receipt = bool(re.search(r'(?i)\s*/read\b', raw_text))
+        clean_text = re.sub(r'(?i)\s*/read\b', '', raw_text).strip()
+
+        relay_insert = supabase.table("admin_message_relays").insert({
+            "admin_id": payload.target_admin_id,
+            "direction": "owner_to_admin",
+            "has_read_receipt": wants_read_receipt
+        }).execute()
+        new_relay_id = relay_insert.data[0]["id"] if relay_insert.data else 0
+
+        markup = None
+        if wants_read_receipt:
+            markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton("Mark as read", callback_data=f"read_{new_relay_id}")]
+            ])
+
+        dm_text = (
+            f"<b>Message from Management:</b>\n\n"
+            f"{clean_text}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"<i>Reply directly to this message to contact management.</i>"
         )
-        return {"success": True}
+
+        sent = await tg_application.bot.send_message(
+            chat_id=payload.target_admin_id,
+            text=dm_text,
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+        supabase.table("admin_message_relays").update({"admin_msg_id": sent.message_id}).eq("id", new_relay_id).execute()
+        return {"success": True, "read_receipt_enabled": wants_read_receipt}
     except Exception as e:
         return {"success": False, "error": str(e)}
-
 
 @app.get("/api/owner/migrations/{admin_id}")
 async def get_owner_migrations(admin_id: int):
@@ -1736,7 +1918,6 @@ async def get_owner_migrations(admin_id: int):
         return {"success": True, "requests": res.data or []}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.post("/api/owner/migrations/test-dm")
 async def send_migration_test_dm(payload: MigrationTestDmPayload):
@@ -1754,18 +1935,14 @@ async def send_migration_test_dm(payload: MigrationTestDmPayload):
         target_link = req.get("target_link") or "https://t.me"
 
         base_msg = payload.custom_message.strip() if (payload.custom_message and payload.custom_message.strip()) else (
-            f"🚨 <b>Channel Relocation Alert</b>\n\n"
+            f"<b>Channel Relocation Notice</b>\n\n"
             f"The community <b>{channel_title}</b> has migrated to a new backup channel.\n\n"
-            f"Tap the button below to restore access immediately:"
+            f"Use the button below to join:"
         )
 
-        watermark = (
-            f"\n\n━━━━━━━━━━━━━━━━━━━\n"
-            f"⚡ <i>Audience Vault Recovery • @{tg_application.bot.username}</i>"
-        )
-
-        full_message = f"🧪 <b>TEST PREVIEW: Migration DM</b>\n\n{base_msg}{watermark}"
-        btn_label = payload.button_text.strip() if (payload.button_text and payload.button_text.strip()) else "📢 Join New Backup Channel"
+        watermark = f"\n\n━━━━━━━━━━━━━━━━━━━\nAudience Vault Recovery • @{tg_application.bot.username}"
+        full_message = f"<b>TEST PREVIEW: Migration DM</b>\n\n{base_msg}{watermark}"
+        btn_label = payload.button_text.strip() if (payload.button_text and payload.button_text.strip()) else f"Join {channel_title}"
         markup = InlineKeyboardMarkup([[InlineKeyboardButton(btn_label, url=target_link)]])
 
         await tg_application.bot.send_message(
@@ -1774,12 +1951,9 @@ async def send_migration_test_dm(payload: MigrationTestDmPayload):
             parse_mode="HTML",
             reply_markup=markup
         )
-
-        return {"success": True, "message": "Test DM delivered to your private chat!"}
+        return {"success": True, "message": "Test DM delivered to your private chat."}
     except Exception as e:
-        logger.error(f"Error in send_migration_test_dm: {e}")
         return {"success": False, "error": str(e)}
-
 
 @app.post("/api/owner/migrations/action")
 async def handle_migration_action(payload: MigrationActionPayload, background_tasks: BackgroundTasks):
@@ -1798,12 +1972,7 @@ async def handle_migration_action(payload: MigrationActionPayload, background_ta
             try:
                 await tg_application.bot.send_message(
                     chat_id=req["admin_id"],
-                    text=(
-                        f"❌ <b>Audience Migration Request Rejected</b>\n\n"
-                        f"• Community: <b>{req['channel_title']}</b>\n"
-                        f"• Target Link: <code>{req['target_link']}</code>\n\n"
-                        f"Your migration request was reviewed and rejected by bot administrators."
-                    ),
+                    text=f"Audience Migration Request Rejected for <b>{req['channel_title']}</b>.",
                     parse_mode="HTML"
                 )
             except Exception:
@@ -1818,18 +1987,15 @@ async def handle_migration_action(payload: MigrationActionPayload, background_ta
         target_link = req.get("target_link") or "https://t.me"
 
         base_msg = payload.custom_message.strip() if (payload.custom_message and payload.custom_message.strip()) else (
-            f"🚨 <b>Channel Relocation Alert</b>\n\n"
+            f"<b>Channel Relocation Notice</b>\n\n"
             f"The community <b>{channel_title}</b> has migrated to a new backup channel.\n\n"
-            f"Tap the button below to restore access immediately:"
+            f"Use the button below to restore access:"
         )
 
-        watermark = (
-            f"\n\n━━━━━━━━━━━━━━━━━━━\n"
-            f"⚡ <i>Audience Vault Recovery • @{tg_application.bot.username}</i>"
-        )
+        watermark = f"\n\n━━━━━━━━━━━━━━━━━━━\nAudience Vault Recovery • @{tg_application.bot.username}"
         full_message = f"{base_msg}{watermark}"
 
-        btn_label = payload.button_text.strip() if (payload.button_text and payload.button_text.strip()) else "📢 Join New Backup Channel"
+        btn_label = payload.button_text.strip() if (payload.button_text and payload.button_text.strip()) else f"Join {channel_title}"
         markup = InlineKeyboardMarkup([[InlineKeyboardButton(btn_label, url=target_link)]])
 
         job_res = supabase.table("broadcast_jobs").insert({
@@ -1887,39 +2053,30 @@ async def handle_migration_action(payload: MigrationActionPayload, background_ta
                         }).eq("id", j_id).execute()
                     except Exception:
                         pass
+
+                    total = delivered + blocked
+                    rate = round((delivered / total * 100), 1) if total > 0 else 0
+                    report = (
+                        f"<b>Migration Dispatch Report</b>\n\n"
+                        f"• Community: <b>{req_data['channel_title']}</b>\n"
+                        f"• Enqueued: <b>{len(user_list)}</b>\n"
+                        f"• Delivered: <b>{delivered}</b>\n"
+                        f"• Blocked / Inactive: <b>{blocked}</b>\n"
+                        f"• Success Rate: <b>{rate}%</b>\n"
+                        f"• Timestamp: <code>{datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}</code>"
+                    )
+                    try:
+                        await tg_application.bot.send_message(chat_id=OWNER_ID, text=report, parse_mode="HTML")
+                    except Exception:
+                        pass
+
                 await floodguard_queue.put((finalize_job, (), {}))
-
-            report_text = (
-                f"📊 <b>AUDIENCE MIGRATION REPORT</b>\n\n"
-                f"• Community: <b>{req_data['channel_title']}</b>\n"
-                f"• Channel ID: <code>{req_data['channel_id']}</code>\n"
-                f"• Target Link: <code>{req_data['target_link']}</code>\n"
-                f"• Subscribers Enqueued: <b>{len(user_list)}</b>\n"
-                f"• Dispatch Mode: <b>FloodGuard (~25/sec)</b>\n"
-                f"• Watermark: <b>Active</b>\n"
-                f"• Timestamp: <code>{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}</code>\n\n"
-                f"✅ <i>All relocation messages have been scheduled for private DM delivery.</i>"
-            )
-
-            try:
-                await tg_application.bot.send_message(chat_id=OWNER_ID, text=report_text, parse_mode="HTML")
-            except Exception as e:
-                logger.error(f"Failed to deliver migration report to owner: {e}")
-
-            if int(req_data["admin_id"]) != OWNER_ID:
-                try:
-                    await tg_application.bot.send_message(chat_id=req_data["admin_id"], text=report_text, parse_mode="HTML")
-                except Exception as e:
-                    logger.error(f"Failed to deliver migration report to admin: {e}")
 
         background_tasks.add_task(execute_migration_pipeline, uids, full_message, markup, req, job_id)
         supabase.table("migration_requests").update({"status": "approved"}).eq("id", payload.request_id).execute()
-
         return {"success": True, "dispatched": len(uids), "job_id": job_id}
     except Exception as e:
-        logger.error(f"Error handling migration action: {e}")
         return {"success": False, "error": str(e)}
-
 
 @app.post("/api/owner/broadcast")
 async def broadcast_to_admins(payload: AdminBroadcastPayload):
@@ -1931,7 +2088,7 @@ async def broadcast_to_admins(payload: AdminBroadcastPayload):
         ch_res = supabase.table("channels").select("admin_id").execute()
         admin_ids = list(set(c["admin_id"] for c in (ch_res.data or []) if c.get("admin_id")))
 
-        notice = f"📢 <b>Network Administrative Announcement</b>\n\n{payload.message}"
+        notice = f"<b>Administrative Announcement:</b>\n\n{payload.message}"
         delivered = 0
         for aid in admin_ids:
             try:
@@ -1942,5 +2099,4 @@ async def broadcast_to_admins(payload: AdminBroadcastPayload):
 
         return {"success": True, "delivered": delivered, "total_admins": len(admin_ids)}
     except Exception as e:
-        logger.error(f"Error in admin broadcast: {e}")
         raise HTTPException(status_code=500, detail=str(e))
