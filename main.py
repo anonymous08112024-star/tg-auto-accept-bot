@@ -551,7 +551,7 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
 
 
 # ============================================================================
-# BULLETPROOF 24/7/365 AUTO-ACCEPT & DM ENGINE
+# BULLETPROOF AUTO-ACCEPT & DM ENGINE
 # ============================================================================
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     req = update.chat_join_request
@@ -1885,8 +1885,8 @@ async def handle_migration_action(payload: MigrationActionPayload, background_ta
                             "status": "completed",
                             "updated_at": datetime.now(timezone.utc).isoformat()
                         }).eq("id", j_id).execute()
-                            except Exception:
-                                pass
+                    except Exception:
+                        pass
                 await floodguard_queue.put((finalize_job, (), {}))
 
             report_text = (
