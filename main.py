@@ -19,6 +19,8 @@ from telegram import (
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
     BotCommand,
     WebAppInfo,
     MenuButtonWebApp
@@ -538,7 +540,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     invite_link = req.invite_link
     invite_link_name = invite_link.name if (invite_link and invite_link.name) else "Default / Unnamed"
 
-    # MODE A: VAULT GATE (Requires tap to verify, approves on callback, secures permanent reach)
+    # MODE A: VAULT GATE (Requires 1-tap activation to establish permanent broadcast reach)
     if approval_mode == "vault_gate":
         try:
             supabase.table("join_logs").insert({
@@ -555,15 +557,19 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             pass
 
         gate_text = (
-            f"<b>Access Verification: {channel_title}</b>\n\n"
-            f"Hello {user.first_name}! Tap the button below to confirm your request and unlock entry to <b>{channel_title}</b>.\n\n"
-            f"<i>🛡️ This activates your disaster recovery backup channel insurance.</i>\n\n"
+            f"<b>Access Pass: {channel_title}</b>\n\n"
+            f"Hello {user.first_name}! Tap the button below to activate your pass and unlock instant entry to <b>{channel_title}</b>.\n\n"
+            f"<i>🛡️ This verifies your account and activates your emergency backup channel insurance.</i>\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
             f"Verification Sentinel • @{context.bot.username}"
         )
-        gate_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⚡ Claim VIP Pass & Enter Channel", callback_data=f"gate_verify_{chat_id}")]
-        ])
+
+        # Native Reply Keyboard (Transmits automatically upon single tap)
+        reply_keyboard = ReplyKeyboardMarkup(
+            [["⚡ Activate VIP Pass & Channel Access"]],
+            resize_keyboard=True,
+            one_time_keyboard=True
+        )
 
         banner_file_id = channel.get("banner_file_id")
         try:
@@ -573,14 +579,14 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
                     photo=banner_file_id,
                     caption=gate_text,
                     parse_mode="HTML",
-                    reply_markup=gate_markup
+                    reply_markup=reply_keyboard
                 )
             else:
                 await context.bot.send_message(
                     chat_id=user.id,
                     text=gate_text,
                     parse_mode="HTML",
-                    reply_markup=gate_markup
+                    reply_markup=reply_keyboard
                 )
         except Exception as e:
             logger.info(f"Could not deliver vault gate pass to {user.id}: {e}")
@@ -707,130 +713,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 # ============================================================================
-# CALLBACK QUERY HANDLER (GATE VERIFICATION & READ RECEIPTS)
-# ============================================================================
-async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    if not query or not query.data:
-        return
-
-    data = query.data
-    user = query.from_user
-
-    # 1. Read Confirmation Trigger
-    if data.startswith("read_"):
-        relay_id = int(data.replace("read_", ""))
-        await query.answer("Marked as read.")
-        try:
-            supabase.table("admin_message_relays").update({
-                "has_read_receipt": True,
-                "read_at": datetime.now(timezone.utc).isoformat()
-            }).eq("id", relay_id).execute()
-
-            await query.edit_message_reply_markup(reply_markup=None)
-
-            notice_text = (
-                f"<b>Read Confirmation</b>\n\n"
-                f"Admin {user.first_name} (@{user.username or user.id}) marked your message as read.\n"
-                f"Time: <code>{datetime.now(IST).strftime('%I:%M:%S %p IST')}</code>"
-            )
-            await context.bot.send_message(chat_id=OWNER_ID, text=notice_text, parse_mode="HTML")
-        except Exception as e:
-            logger.error(f"Error handling read callback: {e}")
-        return
-
-    # 2. Vault Gate Access Pass Verification
-    if data.startswith("gate_verify_"):
-        target_chat_id = int(data.replace("gate_verify_", ""))
-
-        # Approve join request
-        try:
-            await context.bot.approve_chat_join_request(chat_id=target_chat_id, user_id=user.id)
-            await query.answer("Access Granted! Welcome to the community.")
-        except BadRequest as e:
-            await query.answer("Access already verified or request expired.")
-        except Exception as e:
-            logger.error(f"Error approving join request in gate: {e}")
-            await query.answer("Error processing request.")
-            return
-
-        # Mark user as verified in database
-        try:
-            supabase.table("join_logs").update({
-                "status": "verified",
-                "is_verified": True,
-                "verified_at": datetime.now(timezone.utc).isoformat()
-            }).eq("chat_id", target_chat_id).eq("user_id", user.id).execute()
-        except Exception as e:
-            logger.error(f"Error updating verified join_log: {e}")
-
-        # Edit gate message in-place to the full Welcome Card
-        ch_res = supabase.table("channels").select("*").eq("chat_id", target_chat_id).execute()
-        channel = ch_res.data[0] if (ch_res.data and len(ch_res.data) > 0) else {}
-        channel_title = channel.get("chat_title", "Community")
-        current_time_str = datetime.now(IST).strftime("%I:%M %p IST")
-
-        if channel.get("event_mode_enabled") and channel.get("event_message"):
-            raw_msg = channel["event_message"]
-        else:
-            raw_msg = channel.get("custom_message") or "Welcome to {channel}! Your request has been approved."
-
-        formatted_msg = (
-            raw_msg.replace("{name}", user.first_name or "there")
-                   .replace("{channel}", channel_title)
-                   .replace("{username}", f"@{user.username}" if user.username else user.first_name or "")
-                   .replace("{time}", current_time_str)
-        )
-
-        final_text = (
-            f"<b>Request Approved for {channel_title}</b>\n\n"
-            f"{formatted_msg}\n\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"Auto-Approved via @{context.bot.username}"
-        )
-
-        keyboard_rows = []
-        btn1_text = channel.get("custom_btn_text") or f"Enter {channel_title}"
-        btn1_url = channel.get("custom_btn_url") or "https://t.me"
-        keyboard_rows.append([InlineKeyboardButton(btn1_text, url=btn1_url)])
-
-        if channel.get("custom_btn_2_text") and channel.get("custom_btn_2_url"):
-            keyboard_rows.append([InlineKeyboardButton(channel["custom_btn_2_text"], url=channel["custom_btn_2_url"])])
-
-        # Dynamic Promo Slot with [Ad] prefix (if promo_slots_enabled is True)
-        if channel.get("promo_slots_enabled", True):
-            try:
-                now_iso = datetime.now(timezone.utc).isoformat()
-                slots_res = supabase.table("promo_slots").select("*").eq("is_active", True).execute()
-                active_slots = slots_res.data or []
-                valid_slots = [
-                    s for s in active_slots
-                    if not (s.get("expires_at") and s["expires_at"] < now_iso)
-                    and not (s.get("click_limit") and (s.get("total_clicks") or 0) >= s["click_limit"])
-                ]
-                if valid_slots:
-                    chosen = random.choice(valid_slots)
-                    if chosen.get("btn_text"):
-                        raw_btn_text = chosen["btn_text"].strip()
-                        ad_btn_text = raw_btn_text if raw_btn_text.startswith("[Ad]") else f"[Ad] {raw_btn_text}"
-                        redirect_url = f"{BACKEND_URL}/r/{chosen['slot_id']}?u={user.id}"
-                        keyboard_rows.append([InlineKeyboardButton(ad_btn_text, url=redirect_url)])
-            except Exception as e:
-                logger.error(f"Error selecting promo slot: {e}")
-
-        markup = InlineKeyboardMarkup(keyboard_rows)
-
-        try:
-            if query.message.photo:
-                await query.edit_message_caption(caption=final_text, parse_mode="HTML", reply_markup=markup)
-            else:
-                await query.edit_message_text(text=final_text, parse_mode="HTML", reply_markup=markup)
-        except Exception as e:
-            logger.error(f"Error editing message after gate verification: {e}")
-
-
-# ============================================================================
-# TWO-WAY DIRECT MESSAGE RELAY (OWNER <-> ADMINS)
+# TWO-WAY DIRECT MESSAGE RELAY & 1-TAP ACTIVATION RECEIVER
 # ============================================================================
 async def handle_private_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
@@ -840,6 +723,118 @@ async def handle_private_message(update: Update, context: ContextTypes.DEFAULT_T
     sender = update.effective_user
     text = msg.text.strip()
     reply_msg = msg.reply_to_message
+
+    # ========================================================================
+    # 1-TAP ACTIVATION DETECTOR: Sent automatically when ReplyKeyboard is tapped
+    # ========================================================================
+    if text == "⚡ Activate VIP Pass & Channel Access":
+        try:
+            # Look up the latest pending join request for this user
+            p_res = supabase.table("join_logs").select("*").eq("user_id", sender.id).eq("status", "pending").order("created_at", desc=True).limit(1).execute()
+            
+            if p_res.data and len(p_res.data) > 0:
+                pending_req = p_res.data[0]
+                target_chat_id = pending_req["chat_id"]
+
+                # Approve the join request
+                try:
+                    await context.bot.approve_chat_join_request(chat_id=target_chat_id, user_id=sender.id)
+                    logger.info(f"Gate verified & approved via 1-tap: {sender.id} in {target_chat_id}")
+                except BadRequest as e:
+                    logger.info(f"Join request already handled: {e}")
+                except Exception as e:
+                    logger.error(f"Error approving join request: {e}")
+
+                # Mark as verified in database
+                supabase.table("join_logs").update({
+                    "status": "verified",
+                    "is_verified": True,
+                    "verified_at": datetime.now(timezone.utc).isoformat()
+                }).eq("id", pending_req["id"]).execute()
+
+                # Cleanly remove the reply keyboard with acknowledgment
+                await msg.reply_text("✅ <b>Access Pass Verified!</b> Community unlocked.", parse_mode="HTML", reply_markup=ReplyKeyboardRemove())
+
+                # Fetch community details and deliver full Welcome Card
+                ch_res = supabase.table("channels").select("*").eq("chat_id", target_chat_id).execute()
+                channel = ch_res.data[0] if (ch_res.data and len(ch_res.data) > 0) else {}
+                channel_title = channel.get("chat_title", "Community")
+                current_time_str = datetime.now(IST).strftime("%I:%M %p IST")
+
+                if channel.get("event_mode_enabled") and channel.get("event_message"):
+                    raw_msg = channel["event_message"]
+                else:
+                    raw_msg = channel.get("custom_message") or "Welcome to {channel}! Your access request has been approved."
+
+                formatted_msg = (
+                    raw_msg.replace("{name}", sender.first_name or "there")
+                           .replace("{channel}", channel_title)
+                           .replace("{username}", f"@{sender.username}" if sender.username else sender.first_name or "")
+                           .replace("{time}", current_time_str)
+                )
+
+                final_text = (
+                    f"<b>Request Approved for {channel_title}</b>\n\n"
+                    f"{formatted_msg}\n\n"
+                    f"━━━━━━━━━━━━━━━━━━━\n"
+                    f"Auto-Approved via @{context.bot.username}"
+                )
+
+                keyboard_rows = []
+                btn1_text = channel.get("custom_btn_text") or f"Enter {channel_title}"
+                btn1_url = channel.get("custom_btn_url") or "https://t.me"
+                keyboard_rows.append([InlineKeyboardButton(btn1_text, url=btn1_url)])
+
+                if channel.get("custom_btn_2_text") and channel.get("custom_btn_2_url"):
+                    keyboard_rows.append([InlineKeyboardButton(channel["custom_btn_2_text"], url=channel["custom_btn_2_url"])])
+
+                if channel.get("promo_slots_enabled", True):
+                    try:
+                        now_iso = datetime.now(timezone.utc).isoformat()
+                        slots_res = supabase.table("promo_slots").select("*").eq("is_active", True).execute()
+                        active_slots = slots_res.data or []
+                        valid_slots = [
+                            s for s in active_slots
+                            if not (s.get("expires_at") and s["expires_at"] < now_iso)
+                            and not (s.get("click_limit") and (s.get("total_clicks") or 0) >= s["click_limit"])
+                        ]
+                        if valid_slots:
+                            chosen = random.choice(valid_slots)
+                            if chosen.get("btn_text"):
+                                raw_btn_text = chosen["btn_text"].strip()
+                                ad_btn_text = raw_btn_text if raw_btn_text.startswith("[Ad]") else f"[Ad] {raw_btn_text}"
+                                redirect_url = f"{BACKEND_URL}/r/{chosen['slot_id']}?u={sender.id}"
+                                keyboard_rows.append([InlineKeyboardButton(ad_btn_text, url=redirect_url)])
+                    except Exception as e:
+                        logger.error(f"Error selecting promo slot: {e}")
+
+                markup = InlineKeyboardMarkup(keyboard_rows)
+                banner_file_id = channel.get("banner_file_id")
+
+                if banner_file_id:
+                    await context.bot.send_photo(
+                        chat_id=sender.id,
+                        photo=banner_file_id,
+                        caption=final_text,
+                        parse_mode="HTML",
+                        reply_markup=markup
+                    )
+                else:
+                    await context.bot.send_message(
+                        chat_id=sender.id,
+                        text=final_text,
+                        parse_mode="HTML",
+                        reply_markup=markup
+                    )
+                return
+            else:
+                # If no pending request exists, ensure the keyboard is still cleanly removed
+                await msg.reply_text("✅ <b>Your pass is already active and verified!</b>", parse_mode="HTML", reply_markup=ReplyKeyboardRemove())
+                return
+        except Exception as e:
+            logger.error(f"Error processing 1-tap activation: {e}")
+            await msg.reply_text("✅ <b>Access verified.</b>", reply_markup=ReplyKeyboardRemove())
+            return
 
     # CASE A: User/Admin replying to a message sent to them (admin_msg_id)
     if reply_msg:
@@ -926,6 +921,40 @@ async def handle_private_message(update: Update, context: ContextTypes.DEFAULT_T
             "direction": "admin_to_owner"
         }).execute()
         await msg.reply_text("Your message has been delivered to management.")
+
+
+# ============================================================================
+# CALLBACK QUERY HANDLER (READ RECEIPTS & BACKUP KEY HOOKS)
+# ============================================================================
+async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    if not query or not query.data:
+        return
+
+    data = query.data
+    user = query.from_user
+
+    # Read Confirmation Trigger
+    if data.startswith("read_"):
+        relay_id = int(data.replace("read_", ""))
+        await query.answer("Marked as read.")
+        try:
+            supabase.table("admin_message_relays").update({
+                "has_read_receipt": True,
+                "read_at": datetime.now(timezone.utc).isoformat()
+            }).eq("id", relay_id).execute()
+
+            await query.edit_message_reply_markup(reply_markup=None)
+
+            notice_text = (
+                f"<b>Read Confirmation</b>\n\n"
+                f"Admin {user.first_name} (@{user.username or user.id}) marked your message as read.\n"
+                f"Time: <code>{datetime.now(IST).strftime('%I:%M:%S %p IST')}</code>"
+            )
+            await context.bot.send_message(chat_id=OWNER_ID, text=notice_text, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Error handling read callback: {e}")
+        return
 
 
 # ============================================================================
@@ -1653,7 +1682,7 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
                             except BadRequest as e:
                                 logger.warning(f"Broadcast BadRequest for {target_uid}: {e}")
                             except Exception as e:
-                                logger.error(f"Broadcast general error for {target_uid}: {e}")
+                                logger.error(f"Broadcast error for {target_uid}: {e}")
 
                             if j_id and (delivered + blocked) % 20 == 0:
                                 try:
@@ -1686,7 +1715,7 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
                                 f"• Campaign: <b>{target_info}</b>\n"
                                 f"• Total Queued: <b>{len(user_ids)}</b>\n"
                                 f"• Delivered: <b>{delivered}</b>\n"
-                                f"• Blocked: <b>{blocked}</b>\n"
+                                f"• Blocked / Inactive: <b>{blocked}</b>\n"
                                 f"• Delivery Rate: <b>{success_pct}%</b>\n"
                                 f"• Completed At: <code>{datetime.now(IST).strftime('%I:%M:%S %p IST, %d %b %Y')}</code>"
                             )
@@ -2003,7 +2032,7 @@ async def broadcast_subscribers(payload: SubscriberBroadcastPayload, background_
                         f"• Target Segment: <b>{seg_name}</b>\n"
                         f"• Total Queued: <b>{len(uids)}</b>\n"
                         f"• Delivered: <b>{delivered}</b>\n"
-                        f"• Blocked: <b>{blocked}</b>\n"
+                        f"• Blocked / Inactive: <b>{blocked}</b>\n"
                         f"• Delivery Rate: <b>{rate}%</b>\n"
                         f"• Completed At: <code>{datetime.now(IST).strftime('%I:%M:%S %p IST, %d %b %Y')}</code>"
                     )
@@ -2254,7 +2283,7 @@ async def handle_migration_action(payload: MigrationActionPayload, background_ta
                         f"• Community: <b>{req_data['channel_title']}</b>\n"
                         f"• Enqueued: <b>{len(user_list)}</b>\n"
                         f"• Delivered: <b>{delivered}</b>\n"
-                        f"• Blocked: <b>{blocked}</b>\n"
+                        f"• Blocked / Inactive: <b>{blocked}</b>\n"
                         f"• Success Rate: <b>{rate}%</b>\n"
                         f"• Completed At: <code>{datetime.now(IST).strftime('%I:%M:%S %p IST, %d %b %Y')}</code>"
                     )
