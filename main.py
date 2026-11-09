@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request, Response, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
@@ -71,13 +72,39 @@ async def add_cache_headers(request: Request, call_next):
     response.headers["Expires"] = "0"
     return response
 
+# ============================================================================
+# KEEPALIVE & HEALTH CHECK ENDPOINTS (FOR CRON-JOB.ORG)
+# ============================================================================
+@app.get("/")
+@app.get("/health")
+@app.get("/ping")
+async def health_check():
+    """Returns 200 OK for cron-job.org and keepalive monitors."""
+    return {
+        "status": "online",
+        "service": "Auto Request Acceptor Platform",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
 floodguard_queue: asyncio.Queue = asyncio.Queue()
 
 # ============================================================================
-# FLOODGUARD DISPATCH WORKER (MASS BROADCASTS & MIGRATIONS ONLY)
+# BACKGROUND KEEPALIVE & WORKERS
 # ============================================================================
+async def keepalive_worker():
+    """Pings backend health route every 9 minutes to prevent Render free tier sleep."""
+    await asyncio.sleep(15)
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        while True:
+            try:
+                await client.get(f"{BACKEND_URL}/health")
+                logger.info("Keepalive ping delivered to keep server active.")
+            except Exception as e:
+                logger.warning(f"Keepalive ping notice: {e}")
+            await asyncio.sleep(540)  # 9 minutes
+
 async def floodguard_worker(tg_app: Application):
-    """Processes mass outbound broadcasts sequentially with a 40ms pacing interval (~25 req/sec)."""
+    """Processes mass outbound broadcasts sequentially (~25 req/sec)."""
     while True:
         job = await floodguard_queue.get()
         func, args, kwargs = job
@@ -189,7 +216,6 @@ async def redirect_promo_slot(slot_id: int, request: Request, u: Optional[int] =
         slot = res.data[0]
         destination = slot.get("btn_url") or "https://t.me"
 
-        # Check expiration & click limit
         now_iso = datetime.now(timezone.utc).isoformat()
         if slot.get("expires_at") and slot["expires_at"] < now_iso:
             supabase.table("promo_slots").update({"is_active": False}).eq("slot_id", slot_id).execute()
@@ -220,7 +246,6 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args or []
     user = update.effective_user
 
-    # Channel Banner setup
     if args and args[0].startswith("setbanner_"):
         target_channel_id = args[0].replace("setbanner_", "")
         context.user_data["awaiting_banner_for"] = target_channel_id
@@ -240,7 +265,6 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Ad Broadcast Photo setup
     if args and args[0].startswith("setadphoto_"):
         target_user_id = args[0].replace("setadphoto_", "")
         context.user_data["awaiting_ad_photo_for"] = target_user_id
@@ -315,7 +339,6 @@ async def handle_banner_photo(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     photo_file_id = update.message.photo[-1].file_id
 
-    # Handle Ad Draft Photo
     if context.user_data.get("awaiting_ad_photo_for"):
         supabase.table("ad_drafts").upsert({
             "user_id": user_id,
@@ -334,7 +357,6 @@ async def handle_banner_photo(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
 
-    # Handle Channel Banner Photo
     target_channel_id = context.user_data.get("awaiting_banner_for")
     if target_channel_id:
         ch = supabase.table("channels").select("*").eq("chat_id", int(target_channel_id)).execute()
@@ -379,7 +401,6 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
     old_can_invite = getattr(old_member, "can_invite_users", False)
     new_can_invite = getattr(new_member, "can_invite_users", False)
 
-    # Added as basic member
     if new_status == "member" and old_status in ["left", "kicked"]:
         if chat.type in ["group", "supergroup"]:
             try:
@@ -396,9 +417,7 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
                 logger.info(f"Could not send member prompt in group {chat.id}: {e}")
         return
 
-    # Bot is Administrator
     if new_status == "administrator":
-        # Permission revoked
         if old_can_invite and not new_can_invite:
             try:
                 supabase.table("channels").update({"is_active": False}).eq("chat_id", chat.id).execute()
@@ -417,7 +436,6 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
                 logger.error(f"Error handling invite revocation for {chat.id}: {e}")
             return
 
-        # Added without invite permission
         if not new_can_invite:
             try:
                 supabase.table("channels").update({"is_active": False}).eq("chat_id", chat.id).execute()
@@ -516,7 +534,6 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
             except Exception as e:
                 logger.info(f"Could not send confirmation to group {chat.id}: {e}")
 
-    # Demoted or Kicked
     elif new_status in ["left", "kicked"] and old_status == "administrator":
         try:
             supabase.table("channels").update({"is_active": False}).eq("chat_id", chat.id).execute()
@@ -544,41 +561,36 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id = req.chat.id
     user = req.from_user
 
-    # Disregard bot accounts immediately
     if user.is_bot:
         return
 
-    # ------------------------------------------------------------------------
-    # TIER 1: INSTANT UNCONDITIONAL APPROVAL (Executes in < 50ms)
-    # ------------------------------------------------------------------------
-    # Whatever happens in DB, queues, network, or DMs - the user is approved!
+    # TIER 1: DUAL-ATTEMPT IMMEDIATE APPROVAL (< 50ms)
     try:
-        await req.approve()
-        logger.info(f"⚡ INSTANT APPROVAL SUCCESS: user={user.id} in chat={chat_id}")
+        await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user.id)
+        logger.info(f"⚡ Instant approved via bot method: {user.id} in {chat_id}")
     except BadRequest as e:
-        # User already approved or canceled request
         logger.info(f"Join request already handled: {e}")
     except Exception as e:
-        logger.error(f"Critical error on instant approve (will retry): {e}")
+        logger.warning(f"Bot approve method failed, trying shortcut: {e}")
+        try:
+            await req.approve()
+            logger.info(f"⚡ Instant approved via shortcut: {user.id} in {chat_id}")
+        except Exception as e2:
+            logger.error(f"Critical error on instant approve: {e2}")
 
-    # ------------------------------------------------------------------------
-    # TIER 2: ISOLATED BACKGROUND WELCOME DM & TELEMETRY LOGGING
-    # ------------------------------------------------------------------------
-    async def process_welcome_card_and_logs():
+    # TIER 2: NON-BLOCKING WELCOME DM & TELEMETRY
+    async def process_welcome_card():
         try:
             invite_link = req.invite_link
             invite_link_name = invite_link.name if (invite_link and invite_link.name) else "Default / Unnamed"
 
-            # 1. Safe Blacklist check (will never break if table missing)
             try:
                 bl = supabase.table("network_blacklist").select("id").eq("user_id", user.id).execute()
                 if bl.data and len(bl.data) > 0:
-                    logger.info(f"User {user.id} is blacklisted. Suppressing welcome DM.")
                     return
             except Exception:
                 pass
 
-            # 2. Query Channel Settings
             ch_res = supabase.table("channels").select("*").eq("chat_id", chat_id).execute()
             channel = ch_res.data[0] if (ch_res.data and len(ch_res.data) > 0) else {}
 
@@ -604,7 +616,6 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
                 f"⚡ <i>Auto-Approved via @{context.bot.username}</i>"
             )
 
-            # Build Buttons
             keyboard_rows = []
             btn1_text = channel.get("custom_btn_text") or f"📢 {channel_title}"
             btn1_url = channel.get("custom_btn_url") or (invite_link.invite_link if invite_link else "https://t.me")
@@ -613,7 +624,6 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             if channel.get("custom_btn_2_text") and channel.get("custom_btn_2_url"):
                 keyboard_rows.append([InlineKeyboardButton(channel["custom_btn_2_text"], url=channel["custom_btn_2_url"])])
 
-            # Dynamic Promo Slot via Redirect Tracker
             try:
                 now_iso = datetime.now(timezone.utc).isoformat()
                 slots_res = supabase.table("promo_slots").select("*").eq("is_active", True).execute()
@@ -639,7 +649,6 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             silent = bool(channel.get("silent_dm", False))
             banner_file_id = channel.get("banner_file_id")
 
-            # 3. Deliver Welcome DM directly (independent of bulk broadcast queue)
             try:
                 if banner_file_id:
                     await context.bot.send_photo(
@@ -663,7 +672,6 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             except Exception as e:
                 logger.info(f"Could not deliver welcome DM to {user.id}: {e}")
 
-            # 4. Record to join_logs
             try:
                 supabase.table("join_logs").insert({
                     "chat_id": chat_id,
@@ -679,8 +687,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception as e:
             logger.error(f"Unexpected error in background welcome process: {e}")
 
-    # Run DM and telemetry in non-blocking background task
-    asyncio.create_task(process_welcome_card_and_logs())
+    asyncio.create_task(process_welcome_card())
 
 # ============================================================================
 # FASTAPI LIFESPAN & ENGINE RUNNER
@@ -705,7 +712,17 @@ async def startup_event():
 
     await tg_application.initialize()
     await tg_application.start()
-    await tg_application.updater.start_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
+
+    try:
+        await tg_application.bot.delete_webhook(drop_pending_updates=False)
+        logger.info("Cleared previous webhook status.")
+    except Exception as e:
+        logger.warning(f"Notice deleting webhook: {e}")
+
+    await tg_application.updater.start_polling(
+        drop_pending_updates=False,
+        allowed_updates=["message", "chat_member", "my_chat_member", "chat_join_request", "callback_query"]
+    )
 
     try:
         await tg_application.bot.set_chat_menu_button(
@@ -720,7 +737,8 @@ async def startup_event():
         logger.warning(f"Could not set menu buttons: {e}")
 
     asyncio.create_task(floodguard_worker(tg_application))
-    logger.info("God-Tier Telegram Bot Engine & FloodGuard successfully started.")
+    asyncio.create_task(keepalive_worker())
+    logger.info("Telegram Bot Engine, FloodGuard & Keepalive Worker running.")
 
 
 @app.on_event("shutdown")
@@ -766,7 +784,7 @@ class MigrationTestDmPayload(BaseModel):
 class MigrationActionPayload(BaseModel):
     admin_id: int
     request_id: int
-    action: str  # "approve" | "reject"
+    action: str
     custom_message: Optional[str] = None
     button_text: Optional[str] = None
 
@@ -778,7 +796,7 @@ class MagicLinkCreatePayload(BaseModel):
 class PromotionApplyPayload(BaseModel):
     admin_id: int
     admin_username: Optional[str] = ""
-    promo_type: str  # 'slot' | 'broadcast'
+    promo_type: str
     community_name: Optional[str] = ""
     destination_url: str
     button_text: Optional[str] = None
@@ -797,7 +815,7 @@ class PromoTestDmPayload(BaseModel):
 class PromotionActionPayload(BaseModel):
     admin_id: int
     application_id: int
-    action: str  # 'approve' | 'reject'
+    action: str
     assigned_slot_id: Optional[int] = 1
     expires_in_days: Optional[int] = 7
     click_limit: Optional[int] = None
@@ -831,6 +849,9 @@ class DirectMessagePayload(BaseModel):
 class AdminBroadcastPayload(BaseModel):
     admin_id: int
     message: str
+
+class ClearJobsPayload(BaseModel):
+    admin_id: int
 
 class ChannelDefaultsPayload(BaseModel):
     admin_id: int
@@ -1091,7 +1112,6 @@ async def clear_ad_draft_photo(admin_id: int):
 
 @app.post("/api/promotion/test-dm")
 async def send_promo_test_preview(payload: PromoTestDmPayload):
-    """Dispatches a test DM preview of the promo card directly to the advertiser."""
     if not tg_application:
         raise HTTPException(status_code=503, detail="Telegram engine offline")
 
@@ -1225,7 +1245,6 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
                     pass
             return {"success": True, "message": "Application rejected."}
 
-        # Approved Flow
         if appl["promo_type"] == "slot":
             assigned_slot = payload.assigned_slot_id or 1
             expires_at = (datetime.now(timezone.utc) + timedelta(days=payload.expires_in_days or 7)).isoformat()
@@ -1392,6 +1411,18 @@ async def get_broadcast_jobs_api(admin_id: int):
         res = supabase.table("broadcast_jobs").select("*").order("created_at", desc=True).limit(5).execute()
         return {"success": True, "jobs": res.data or []}
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/owner/broadcast-jobs/clear")
+async def clear_broadcast_jobs_api(payload: ClearJobsPayload):
+    """Clears past broadcast logs from the Live Delivery Sentinel."""
+    verify_owner(payload.admin_id)
+    try:
+        supabase.table("broadcast_jobs").delete().neq("id", 0).execute()
+        return {"success": True, "message": "Broadcast logs cleared."}
+    except Exception as e:
+        logger.error(f"Error clearing broadcast jobs: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1854,8 +1885,8 @@ async def handle_migration_action(payload: MigrationActionPayload, background_ta
                             "status": "completed",
                             "updated_at": datetime.now(timezone.utc).isoformat()
                         }).eq("id", j_id).execute()
-                    except Exception:
-                        pass
+                            except Exception:
+                                pass
                 await floodguard_queue.put((finalize_job, (), {}))
 
             report_text = (
@@ -1892,7 +1923,6 @@ async def handle_migration_action(payload: MigrationActionPayload, background_ta
 
 @app.post("/api/owner/broadcast")
 async def broadcast_to_admins(payload: AdminBroadcastPayload):
-    """Dispatches announcement specifically to all registered channel admins."""
     verify_owner(payload.admin_id)
     if not tg_application:
         raise HTTPException(status_code=503, detail="Telegram engine offline")
