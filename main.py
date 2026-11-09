@@ -44,7 +44,7 @@ logging.basicConfig(
 logger = logging.getLogger("GodTierBot")
 
 # ============================================================================
-# CONFIGURATION & CONSTANTS
+# CONFIGURATION & TIMEZONE (IST: UTC+5:30)
 # ============================================================================
 OWNER_ID = 5527067319
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
@@ -52,6 +52,8 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 DASHBOARD_URL = os.getenv("DASHBOARD_URL", "https://tg-accept-dash.pages.dev")
 BACKEND_URL = os.getenv("BACKEND_URL", "https://tg-auto-accept-bot.onrender.com")
+
+IST = timezone(timedelta(hours=5, minutes=30))
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -83,7 +85,7 @@ async def health_check():
     return {
         "status": "online",
         "service": "Auto Request Acceptor Platform",
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp_ist": datetime.now(IST).strftime("%d %b %Y, %I:%M:%S %p IST")
     }
 
 floodguard_queue: asyncio.Queue = asyncio.Queue()
@@ -565,7 +567,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             channel = ch_res.data[0] if (ch_res.data and len(ch_res.data) > 0) else {}
 
             channel_title = channel.get("chat_title") or (req.chat.title if req.chat else "Community")
-            current_time_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
+            current_time_str = datetime.now(IST).strftime("%I:%M %p IST")
 
             if channel.get("event_mode_enabled") and channel.get("event_message"):
                 raw_msg = channel["event_message"]
@@ -594,6 +596,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             if channel.get("custom_btn_2_text") and channel.get("custom_btn_2_url"):
                 keyboard_rows.append([InlineKeyboardButton(channel["custom_btn_2_text"], url=channel["custom_btn_2_url"])])
 
+            # Dynamic Promo Slot with [Ad] prefix
             try:
                 now_iso = datetime.now(timezone.utc).isoformat()
                 slots_res = supabase.table("promo_slots").select("*").eq("is_active", True).execute()
@@ -610,8 +613,10 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
                 if valid_slots:
                     chosen = random.choice(valid_slots)
                     if chosen.get("btn_text"):
+                        raw_btn_text = chosen["btn_text"].strip()
+                        ad_btn_text = raw_btn_text if raw_btn_text.startswith("[Ad]") else f"[Ad] {raw_btn_text}"
                         redirect_url = f"{BACKEND_URL}/r/{chosen['slot_id']}?u={user.id}"
-                        keyboard_rows.append([InlineKeyboardButton(chosen["btn_text"], url=redirect_url)])
+                        keyboard_rows.append([InlineKeyboardButton(ad_btn_text, url=redirect_url)])
             except Exception as e:
                 logger.error(f"Error selecting promo slot: {e}")
 
@@ -670,17 +675,37 @@ async def handle_private_message(update: Update, context: ContextTypes.DEFAULT_T
 
     sender = update.effective_user
     text = msg.text.strip()
+    reply_msg = msg.reply_to_message
 
-    # 1. OWNER REPLYING IN TELEGRAM TO AN ADMIN'S MESSAGE
-    if sender.id == OWNER_ID:
-        if msg.reply_to_message:
-            reply_id = msg.reply_to_message.message_id
-            relay_res = supabase.table("admin_message_relays").select("*").eq("owner_msg_id", reply_id).execute()
-            if relay_res.data and len(relay_res.data) > 0:
-                record = relay_res.data[0]
-                target_admin_id = record["admin_id"]
+    # CASE A: User/Admin replying to a message sent to them (admin_msg_id)
+    # Checks admin_msg_id first so owner self-testing also works!
+    if reply_msg:
+        r_admin = supabase.table("admin_message_relays").select("*").eq("admin_msg_id", reply_msg.message_id).execute()
+        if r_admin.data and len(r_admin.data) > 0:
+            sender_label = f"Admin {sender.first_name} (@{sender.username or 'NoUsername'})"
+            owner_notice = (
+                f"<b>Reply from {sender_label}</b>\n"
+                f"ID: <code>{sender.id}</code> • Time: <code>{datetime.now(IST).strftime('%I:%M %p IST')}</code>\n\n"
+                f"\"{text}\"\n\n"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"<i>Reply directly to this message to answer this admin.</i>"
+            )
+            sent_to_owner = await context.bot.send_message(chat_id=OWNER_ID, text=owner_notice, parse_mode="HTML")
+            supabase.table("admin_message_relays").insert({
+                "admin_id": sender.id,
+                "owner_msg_id": sent_to_owner.message_id,
+                "admin_msg_id": msg.message_id,
+                "direction": "admin_to_owner"
+            }).execute()
+            await msg.reply_text("Your reply has been forwarded to management.")
+            return
 
-                # Check for /read tag
+        # CASE B: Owner replying to a forwarded message from an admin (owner_msg_id)
+        if sender.id == OWNER_ID:
+            r_owner = supabase.table("admin_message_relays").select("*").eq("owner_msg_id", reply_msg.message_id).execute()
+            if r_owner.data and len(r_owner.data) > 0:
+                target_admin_id = r_owner.data[0]["admin_id"]
+
                 wants_read_receipt = bool(re.search(r'(?i)\s*/read\b', text))
                 clean_text = re.sub(r'(?i)\s*/read\b', '', text).strip()
 
@@ -705,51 +730,39 @@ async def handle_private_message(update: Update, context: ContextTypes.DEFAULT_T
                     f"<i>Reply directly to this message to contact management.</i>"
                 )
 
-                try:
-                    sent = await context.bot.send_message(
-                        chat_id=target_admin_id,
-                        text=dm_text,
-                        parse_mode="HTML",
-                        reply_markup=markup
-                    )
-                    supabase.table("admin_message_relays").update({"admin_msg_id": sent.message_id}).eq("id", new_relay_id).execute()
-                    await msg.reply_text("Message delivered to admin.")
-                except Exception as e:
-                    await msg.reply_text(f"Could not deliver reply: {e}")
+                sent = await context.bot.send_message(
+                    chat_id=target_admin_id,
+                    text=dm_text,
+                    parse_mode="HTML",
+                    reply_markup=markup
+                )
+                supabase.table("admin_message_relays").update({"admin_msg_id": sent.message_id}).eq("id", new_relay_id).execute()
+                await msg.reply_text("Message delivered to admin.")
                 return
 
-    # 2. ADMIN MESSAGING OR REPLYING TO OWNER
-    else:
-        # Check if sender is registered in channels table
+    # CASE C: Unprompted message sent to bot by an admin
+    if sender.id != OWNER_ID:
         ch_check = supabase.table("channels").select("admin_id").eq("admin_id", sender.id).execute()
         admin_channels = ch_check.data or []
-
         sender_label = f"Admin {sender.first_name} (@{sender.username or 'NoUsername'})"
         info_sub = f"ID: <code>{sender.id}</code> • Communities: <b>{len(admin_channels)}</b>"
 
         owner_notice = (
             f"<b>Message from {sender_label}</b>\n"
-            f"{info_sub}\n\n"
+            f"{info_sub} • Time: <code>{datetime.now(IST).strftime('%I:%M %p IST')}</code>\n\n"
             f"\"{text}\"\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
-            f"<i>Reply directly to this message to respond to this admin.</i>"
+            f"<i>Reply directly to this message to answer this admin.</i>"
         )
 
-        try:
-            sent_to_owner = await context.bot.send_message(
-                chat_id=OWNER_ID,
-                text=owner_notice,
-                parse_mode="HTML"
-            )
-            supabase.table("admin_message_relays").insert({
-                "admin_id": sender.id,
-                "owner_msg_id": sent_to_owner.message_id,
-                "admin_msg_id": msg.message_id,
-                "direction": "admin_to_owner"
-            }).execute()
-            await msg.reply_text("Your message has been delivered to management.")
-        except Exception as e:
-            logger.error(f"Error relaying admin message: {e}")
+        sent_to_owner = await context.bot.send_message(chat_id=OWNER_ID, text=owner_notice, parse_mode="HTML")
+        supabase.table("admin_message_relays").insert({
+            "admin_id": sender.id,
+            "owner_msg_id": sent_to_owner.message_id,
+            "admin_msg_id": msg.message_id,
+            "direction": "admin_to_owner"
+        }).execute()
+        await msg.reply_text("Your message has been delivered to management.")
 
 
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -770,14 +783,14 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
                 "read_at": datetime.now(timezone.utc).isoformat()
             }).eq("id", relay_id).execute()
 
-            # Remove button on admin side cleanly without adding emojis
+            # Remove button cleanly
             await query.edit_message_reply_markup(reply_markup=None)
 
-            # Notify owner
+            # Notify owner with IST timestamp
             notice_text = (
                 f"<b>Read Confirmation</b>\n\n"
                 f"Admin {user.first_name} (@{user.username or user.id}) marked your message as read.\n"
-                f"Time: <code>{datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}</code>"
+                f"Time: <code>{datetime.now(IST).strftime('%I:%M:%S %p IST')}</code>"
             )
             await context.bot.send_message(chat_id=OWNER_ID, text=notice_text, parse_mode="HTML")
         except Exception as e:
@@ -1114,7 +1127,7 @@ async def send_test_dm(payload: TestDmPayload):
     else:
         msg = channel.get("custom_message") or "Welcome to {channel}! Your request has been approved."
 
-    formatted = msg.replace("{name}", "Admin").replace("{channel}", channel_title).replace("{username}", "@Admin").replace("{time}", "12:00 UTC")
+    formatted = msg.replace("{name}", "Admin").replace("{channel}", channel_title).replace("{username}", "@Admin").replace("{time}", "12:00 PM IST")
 
     text = (
         f"<b>TEST PREVIEW: Approval Card</b>\n\n"
@@ -1229,7 +1242,9 @@ async def send_promo_test_preview(payload: PromoTestDmPayload):
 
         markup = None
         if payload.button_text and payload.destination_url:
-            markup = InlineKeyboardMarkup([[InlineKeyboardButton(payload.button_text, url=payload.destination_url)]])
+            raw_btn = payload.button_text.strip()
+            ad_label = raw_btn if raw_btn.startswith("[Ad]") else f"[Ad] {raw_btn}"
+            markup = InlineKeyboardMarkup([[InlineKeyboardButton(ad_label, url=payload.destination_url)]])
 
         if payload.promo_type == "broadcast":
             text = (
@@ -1344,7 +1359,9 @@ async def owner_test_preview_ad(payload: PromoOwnerTestPreviewPayload):
         appl = app_res.data[0]
         markup = None
         if appl.get("button_text") and appl.get("destination_url"):
-            markup = InlineKeyboardMarkup([[InlineKeyboardButton(appl["button_text"], url=appl["destination_url"])]])
+            raw_btn = appl["button_text"].strip()
+            ad_label = raw_btn if raw_btn.startswith("[Ad]") else f"[Ad] {raw_btn}"
+            markup = InlineKeyboardMarkup([[InlineKeyboardButton(ad_label, url=appl["destination_url"])]])
 
         if appl["promo_type"] == "broadcast":
             text = (
@@ -1359,7 +1376,7 @@ async def owner_test_preview_ad(payload: PromoOwnerTestPreviewPayload):
                 f"<b>Request Approved for {appl.get('target_channel_title', 'Sample Community')}</b>\n\n"
                 f"Welcome! Your request has been approved.\n\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
-                f"Applicant: @{appl.get('admin_username') or appl.get('admin_id')} | Slot Destination: {appl.get('destination_url')}"
+                f"Applicant: @{appl.get('admin_username') or appl.get('admin_id')} | Destination: {appl.get('destination_url')}"
             )
 
         if appl.get("banner_file_id"):
@@ -1422,9 +1439,12 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
             assigned_slot = payload.assigned_slot_id or 1
             expires_at = (datetime.now(timezone.utc) + timedelta(days=payload.expires_in_days or 7)).isoformat()
             
+            raw_btn = (appl.get("button_text") or "Sponsored").strip()
+            slot_btn_label = raw_btn if raw_btn.startswith("[Ad]") else f"[Ad] {raw_btn}"
+
             supabase.table("promo_slots").upsert({
                 "slot_id": assigned_slot,
-                "btn_text": appl.get("button_text") or "Sponsored",
+                "btn_text": slot_btn_label,
                 "btn_url": appl["destination_url"],
                 "is_active": True,
                 "expires_at": expires_at,
@@ -1445,7 +1465,9 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
             if uids and tg_application:
                 markup = None
                 if appl.get("button_text") and appl.get("destination_url"):
-                    markup = InlineKeyboardMarkup([[InlineKeyboardButton(appl["button_text"], url=appl["destination_url"])]])
+                    raw_btn = appl["button_text"].strip()
+                    ad_btn_label = raw_btn if raw_btn.startswith("[Ad]") else f"[Ad] {raw_btn}"
+                    markup = InlineKeyboardMarkup([[InlineKeyboardButton(ad_btn_label, url=appl["destination_url"])]])
 
                 job_res = supabase.table("broadcast_jobs").insert({
                     "job_type": "paid_broadcast",
@@ -1517,7 +1539,6 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
                             except Exception:
                                 pass
 
-                            # Send Completion Report to Owner
                             total_processed = delivered + blocked
                             success_pct = round((delivered / total_processed * 100), 1) if total_processed > 0 else 0
                             report = (
@@ -1527,7 +1548,7 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
                                 f"• Delivered: <b>{delivered}</b>\n"
                                 f"• Blocked / Inactive: <b>{blocked}</b>\n"
                                 f"• Delivery Rate: <b>{success_pct}%</b>\n"
-                                f"• Completed At: <code>{datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}</code>"
+                                f"• Completed At: <code>{datetime.now(IST).strftime('%I:%M:%S %p IST, %d %b %Y')}</code>"
                             )
                             try:
                                 await tg_application.bot.send_message(chat_id=OWNER_ID, text=report, parse_mode="HTML")
@@ -1705,27 +1726,36 @@ async def export_subscribers_csv(admin_id: int):
 
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["User ID", "Username", "First Name", "First Channel Joined", "Admin ID", "Joined Timestamp"])
+        writer.writerow(["User ID", "Username", "First Name", "First Channel Joined", "Admin ID", "Joined Timestamp IST"])
 
         for r in rows:
+            created_utc = r.get("first_joined_at", "")
+            time_display = ""
+            if created_utc:
+                try:
+                    dt = datetime.fromisoformat(created_utc.replace("Z", "+00:00"))
+                    time_display = dt.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST")
+                except Exception:
+                    time_display = created_utc
+
             writer.writerow([
                 r.get("user_id"),
                 f"@{r.get('username')}" if r.get("username") else "",
                 r.get("first_name", ""),
                 r.get("first_joined_channel_title", ""),
                 r.get("channel_admin_id", ""),
-                r.get("first_joined_at", "")
+                time_display
             ])
 
         csv_bytes = output.getvalue().encode("utf-8")
         doc = io.BytesIO(csv_bytes)
-        filename = f"audience_vault_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
+        filename = f"audience_vault_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}.csv"
         doc.name = filename
 
         await tg_application.bot.send_document(
             chat_id=admin_id,
             document=doc,
-            caption=f"Audience Vault CSV: {len(rows)} unique subscribers.",
+            caption=f"Audience Vault CSV: {len(rows)} unique subscribers.\nGenerated: {datetime.now(IST).strftime('%d %b %Y, %I:%M %p IST')}",
             parse_mode="HTML"
         )
         return {"success": True, "count": len(rows), "message": "CSV delivered to your Telegram chat."}
@@ -1820,7 +1850,7 @@ async def broadcast_subscribers(payload: SubscriberBroadcastPayload, background_
                         f"• Delivered: <b>{delivered}</b>\n"
                         f"• Blocked / Inactive: <b>{blocked}</b>\n"
                         f"• Delivery Rate: <b>{rate}%</b>\n"
-                        f"• Completed At: <code>{datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}</code>"
+                        f"• Completed At: <code>{datetime.now(IST).strftime('%I:%M:%S %p IST, %d %b %Y')}</code>"
                     )
                     try:
                         await tg_application.bot.send_message(chat_id=OWNER_ID, text=report, parse_mode="HTML")
@@ -1844,9 +1874,12 @@ async def update_promo_slots(payload: PromoSlotsUpdatePayload):
             if slot.expires_in_days and slot.expires_in_days > 0:
                 expires_at = (now_dt + timedelta(days=slot.expires_in_days)).isoformat()
 
+            raw_btn = slot.btn_text.strip()
+            slot_label = raw_btn if raw_btn.startswith("[Ad]") else f"[Ad] {raw_btn}"
+
             update_data = {
                 "slot_id": slot.slot_id,
-                "btn_text": slot.btn_text,
+                "btn_text": slot_label,
                 "btn_url": slot.btn_url,
                 "is_active": slot.is_active,
                 "click_limit": slot.click_limit
@@ -2063,7 +2096,7 @@ async def handle_migration_action(payload: MigrationActionPayload, background_ta
                         f"• Delivered: <b>{delivered}</b>\n"
                         f"• Blocked / Inactive: <b>{blocked}</b>\n"
                         f"• Success Rate: <b>{rate}%</b>\n"
-                        f"• Timestamp: <code>{datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}</code>"
+                        f"• Completed At: <code>{datetime.now(IST).strftime('%I:%M:%S %p IST, %d %b %Y')}</code>"
                     )
                     try:
                         await tg_application.bot.send_message(chat_id=OWNER_ID, text=report, parse_mode="HTML")
