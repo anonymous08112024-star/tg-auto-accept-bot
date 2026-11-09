@@ -76,7 +76,7 @@ async def add_cache_headers(request: Request, call_next):
     return response
 
 # ============================================================================
-# HEALTH & KEEP-ALIVE ENDPOINTS
+# HEALTH & KEEPALIVE WORKERS
 # ============================================================================
 @app.get("/")
 @app.get("/health")
@@ -134,12 +134,16 @@ async def get_system_channel_defaults() -> Dict[str, Any]:
         "silent_dm": False,
         "anti_bot_enabled": True,
         "event_mode_enabled": False,
-        "event_message": ""
+        "event_message": "",
+        "approval_mode": "instant",
+        "promo_slots_enabled": True
     }
     try:
         res = supabase.table("system_config").select("value").eq("key", "channel_defaults").execute()
         if res.data and len(res.data) > 0:
-            return res.data[0]["value"]
+            val = res.data[0]["value"]
+            fallback.update(val)
+            return fallback
     except Exception as e:
         logger.error(f"Error fetching channel defaults: {e}")
     return fallback
@@ -178,7 +182,7 @@ async def get_promo_packages_config() -> Dict[str, Any]:
     return fallback
 
 # ============================================================================
-# HORIZON STATS & CLICK ANALYTICS
+# HORIZON STATS & ACTIVE VAULT METRICS
 # ============================================================================
 def compute_horizon_stats(chat_id: Optional[int] = None) -> Dict[str, int]:
     now = datetime.now(timezone.utc)
@@ -186,23 +190,32 @@ def compute_horizon_stats(chat_id: Optional[int] = None) -> Dict[str, int]:
     t_30d = (now - timedelta(days=30)).isoformat()
     t_90d = (now - timedelta(days=90)).isoformat()
 
-    stats = {"joins_24h": 0, "joins_30d": 0, "joins_90d": 0, "subscriber_count": 0}
+    stats = {
+        "joins_24h": 0,
+        "joins_30d": 0,
+        "joins_90d": 0,
+        "subscriber_count": 0,
+        "verified_subscribers": 0
+    }
     try:
         q_24h = supabase.table("join_logs").select("*", count="exact", head=True).gte("created_at", t_24h)
         q_30d = supabase.table("join_logs").select("*", count="exact", head=True).gte("created_at", t_30d)
         q_90d = supabase.table("join_logs").select("*", count="exact", head=True).gte("created_at", t_90d)
         q_all = supabase.table("join_logs").select("*", count="exact", head=True)
+        q_ver = supabase.table("join_logs").select("*", count="exact", head=True).eq("is_verified", True)
 
         if chat_id is not None:
             q_24h = q_24h.eq("chat_id", chat_id)
             q_30d = q_30d.eq("chat_id", chat_id)
             q_90d = q_90d.eq("chat_id", chat_id)
             q_all = q_all.eq("chat_id", chat_id)
+            q_ver = q_ver.eq("chat_id", chat_id)
 
         stats["joins_24h"] = q_24h.execute().count or 0
         stats["joins_30d"] = q_30d.execute().count or 0
         stats["joins_90d"] = q_90d.execute().count or 0
         stats["subscriber_count"] = q_all.execute().count or 0
+        stats["verified_subscribers"] = q_ver.execute().count or 0
     except Exception as e:
         logger.error(f"Error calculating stats: {e}")
 
@@ -230,7 +243,6 @@ def compute_slot_clicks(slot_id: int) -> Dict[str, int]:
 # ============================================================================
 @app.get("/api/media/preview/{file_id}")
 async def get_media_preview(file_id: str):
-    """Resolves Telegram file_id to direct CDN URL so web browsers can render it."""
     if not tg_application:
         raise HTTPException(status_code=503, detail="Bot engine offline")
     try:
@@ -340,12 +352,13 @@ async def cmd_mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for ch in channels:
         h = compute_horizon_stats(ch["chat_id"])
         status = "Active" if ch.get("is_active", True) else "Paused"
+        mode_label = "Vault Gate (Protected)" if ch.get("approval_mode") == "vault_gate" else "Instant"
         text += (
             f"<b>{ch['chat_title']}</b>\n"
+            f"• Mode: <b>{mode_label}</b>\n"
             f"• 24h Joins: <b>+{h['joins_24h']}</b>\n"
-            f"• 30d Joins: <b>{h['joins_30d']}</b>\n"
-            f"• 90d Joins: <b>{h['joins_90d']}</b>\n"
-            f"• Reachable Subscribers: <b>{h['subscriber_count']}</b>\n"
+            f"• Total Approved: <b>{h['subscriber_count']}</b>\n"
+            f"• Active Vault (Verified): <b>{h['verified_subscribers']}</b>\n"
             f"• Status: {status}\n\n"
         )
     keyboard = InlineKeyboardMarkup([
@@ -416,29 +429,7 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
     old_can_invite = getattr(old_member, "can_invite_users", False)
     new_can_invite = getattr(new_member, "can_invite_users", False)
 
-    if new_status == "member" and old_status in ["left", "kicked"]:
-        if chat.type in ["group", "supergroup"]:
-            try:
-                await context.bot.send_message(
-                    chat_id=chat.id,
-                    text="To activate instant approvals, promote this bot to Administrator with 'Invite Users via Link' enabled."
-                )
-            except Exception:
-                pass
-        return
-
     if new_status == "administrator":
-        if old_can_invite and not new_can_invite:
-            try:
-                supabase.table("channels").update({"is_active": False}).eq("chat_id", chat.id).execute()
-                await context.bot.send_message(
-                    chat_id=effective_admin_id,
-                    text=f"Permission Revoked: 'Invite Users via Link' was removed for {chat.title}. Auto-accept is paused."
-                )
-            except Exception:
-                pass
-            return
-
         if not new_can_invite:
             try:
                 supabase.table("channels").update({"is_active": False}).eq("chat_id", chat.id).execute()
@@ -482,6 +473,8 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
                     "anti_bot_enabled": defaults.get("anti_bot_enabled", True),
                     "event_mode_enabled": defaults.get("event_mode_enabled", False),
                     "event_message": defaults.get("event_message", ""),
+                    "approval_mode": defaults.get("approval_mode", "instant"),
+                    "promo_slots_enabled": defaults.get("promo_slots_enabled", True),
                     "is_active": True
                 }).execute()
             else:
@@ -524,7 +517,7 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
 
 
 # ============================================================================
-# BULLETPROOF AUTO-ACCEPT & DM ENGINE
+# AUTO-ACCEPT & DUAL-MODE APPROVAL ENGINE
 # ============================================================================
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     req = update.chat_join_request
@@ -537,7 +530,63 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     if user.is_bot:
         return
 
-    # TIER 1: DUAL-ATTEMPT IMMEDIATE APPROVAL (< 50ms)
+    # Check community configuration
+    ch_res = supabase.table("channels").select("*").eq("chat_id", chat_id).execute()
+    channel = ch_res.data[0] if (ch_res.data and len(ch_res.data) > 0) else {}
+    approval_mode = channel.get("approval_mode", "instant")
+    channel_title = channel.get("chat_title") or (req.chat.title if req.chat else "Community")
+    invite_link = req.invite_link
+    invite_link_name = invite_link.name if (invite_link and invite_link.name) else "Default / Unnamed"
+
+    # MODE A: VAULT GATE (Requires tap to verify, approves on callback, secures permanent reach)
+    if approval_mode == "vault_gate":
+        try:
+            supabase.table("join_logs").insert({
+                "chat_id": chat_id,
+                "user_id": user.id,
+                "username": user.username or "",
+                "first_name": user.first_name or "",
+                "invite_link_name": invite_link_name,
+                "status": "pending",
+                "is_verified": False,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }).execute()
+        except Exception:
+            pass
+
+        gate_text = (
+            f"<b>Access Verification: {channel_title}</b>\n\n"
+            f"Hello {user.first_name}! Tap the button below to confirm your request and unlock entry to <b>{channel_title}</b>.\n\n"
+            f"<i>🛡️ This activates your disaster recovery backup channel insurance.</i>\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"Verification Sentinel • @{context.bot.username}"
+        )
+        gate_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⚡ Claim VIP Pass & Enter Channel", callback_data=f"gate_verify_{chat_id}")]
+        ])
+
+        banner_file_id = channel.get("banner_file_id")
+        try:
+            if banner_file_id:
+                await context.bot.send_photo(
+                    chat_id=user.id,
+                    photo=banner_file_id,
+                    caption=gate_text,
+                    parse_mode="HTML",
+                    reply_markup=gate_markup
+                )
+            else:
+                await context.bot.send_message(
+                    chat_id=user.id,
+                    text=gate_text,
+                    parse_mode="HTML",
+                    reply_markup=gate_markup
+                )
+        except Exception as e:
+            logger.info(f"Could not deliver vault gate pass to {user.id}: {e}")
+        return
+
+    # MODE B: INSTANT APPROVAL (< 50ms)
     try:
         await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user.id)
         logger.info(f"Instant approved: {user.id} in {chat_id}")
@@ -550,12 +599,9 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception as e2:
             logger.error(f"Error on instant approve: {e2}")
 
-    # TIER 2: NON-BLOCKING WELCOME DM & TELEMETRY
+    # Deliver Welcome Card in Background
     async def process_welcome_card():
         try:
-            invite_link = req.invite_link
-            invite_link_name = invite_link.name if (invite_link and invite_link.name) else "Default / Unnamed"
-
             try:
                 bl = supabase.table("network_blacklist").select("id").eq("user_id", user.id).execute()
                 if bl.data and len(bl.data) > 0:
@@ -563,10 +609,6 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             except Exception:
                 pass
 
-            ch_res = supabase.table("channels").select("*").eq("chat_id", chat_id).execute()
-            channel = ch_res.data[0] if (ch_res.data and len(ch_res.data) > 0) else {}
-
-            channel_title = channel.get("chat_title") or (req.chat.title if req.chat else "Community")
             current_time_str = datetime.now(IST).strftime("%I:%M %p IST")
 
             if channel.get("event_mode_enabled") and channel.get("event_message"):
@@ -596,29 +638,26 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             if channel.get("custom_btn_2_text") and channel.get("custom_btn_2_url"):
                 keyboard_rows.append([InlineKeyboardButton(channel["custom_btn_2_text"], url=channel["custom_btn_2_url"])])
 
-            # Dynamic Promo Slot with [Ad] prefix
-            try:
-                now_iso = datetime.now(timezone.utc).isoformat()
-                slots_res = supabase.table("promo_slots").select("*").eq("is_active", True).execute()
-                active_slots = slots_res.data or []
-                
-                valid_slots = []
-                for s in active_slots:
-                    if s.get("expires_at") and s["expires_at"] < now_iso:
-                        continue
-                    if s.get("click_limit") and (s.get("total_clicks") or 0) >= s["click_limit"]:
-                        continue
-                    valid_slots.append(s)
-
-                if valid_slots:
-                    chosen = random.choice(valid_slots)
-                    if chosen.get("btn_text"):
-                        raw_btn_text = chosen["btn_text"].strip()
-                        ad_btn_text = raw_btn_text if raw_btn_text.startswith("[Ad]") else f"[Ad] {raw_btn_text}"
-                        redirect_url = f"{BACKEND_URL}/r/{chosen['slot_id']}?u={user.id}"
-                        keyboard_rows.append([InlineKeyboardButton(ad_btn_text, url=redirect_url)])
-            except Exception as e:
-                logger.error(f"Error selecting promo slot: {e}")
+            # Dynamic Promo Slot with [Ad] prefix (only if promo_slots_enabled is True)
+            if channel.get("promo_slots_enabled", True):
+                try:
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    slots_res = supabase.table("promo_slots").select("*").eq("is_active", True).execute()
+                    active_slots = slots_res.data or []
+                    valid_slots = [
+                        s for s in active_slots
+                        if not (s.get("expires_at") and s["expires_at"] < now_iso)
+                        and not (s.get("click_limit") and (s.get("total_clicks") or 0) >= s["click_limit"])
+                    ]
+                    if valid_slots:
+                        chosen = random.choice(valid_slots)
+                        if chosen.get("btn_text"):
+                            raw_btn_text = chosen["btn_text"].strip()
+                            ad_btn_text = raw_btn_text if raw_btn_text.startswith("[Ad]") else f"[Ad] {raw_btn_text}"
+                            redirect_url = f"{BACKEND_URL}/r/{chosen['slot_id']}?u={user.id}"
+                            keyboard_rows.append([InlineKeyboardButton(ad_btn_text, url=redirect_url)])
+                except Exception as e:
+                    logger.error(f"Error selecting promo slot: {e}")
 
             markup = InlineKeyboardMarkup(keyboard_rows)
             silent = bool(channel.get("silent_dm", False))
@@ -654,6 +693,8 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
                     "username": user.username or "",
                     "first_name": user.first_name or "",
                     "invite_link_name": invite_link_name,
+                    "status": "passive",
+                    "is_verified": False,
                     "created_at": datetime.now(timezone.utc).isoformat()
                 }).execute()
             except Exception as e:
@@ -663,6 +704,129 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             logger.error(f"Error in background welcome card: {e}")
 
     asyncio.create_task(process_welcome_card())
+
+
+# ============================================================================
+# CALLBACK QUERY HANDLER (GATE VERIFICATION & READ RECEIPTS)
+# ============================================================================
+async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    if not query or not query.data:
+        return
+
+    data = query.data
+    user = query.from_user
+
+    # 1. Read Confirmation Trigger
+    if data.startswith("read_"):
+        relay_id = int(data.replace("read_", ""))
+        await query.answer("Marked as read.")
+        try:
+            supabase.table("admin_message_relays").update({
+                "has_read_receipt": True,
+                "read_at": datetime.now(timezone.utc).isoformat()
+            }).eq("id", relay_id).execute()
+
+            await query.edit_message_reply_markup(reply_markup=None)
+
+            notice_text = (
+                f"<b>Read Confirmation</b>\n\n"
+                f"Admin {user.first_name} (@{user.username or user.id}) marked your message as read.\n"
+                f"Time: <code>{datetime.now(IST).strftime('%I:%M:%S %p IST')}</code>"
+            )
+            await context.bot.send_message(chat_id=OWNER_ID, text=notice_text, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Error handling read callback: {e}")
+        return
+
+    # 2. Vault Gate Access Pass Verification
+    if data.startswith("gate_verify_"):
+        target_chat_id = int(data.replace("gate_verify_", ""))
+
+        # Approve join request
+        try:
+            await context.bot.approve_chat_join_request(chat_id=target_chat_id, user_id=user.id)
+            await query.answer("Access Granted! Welcome to the community.")
+        except BadRequest as e:
+            await query.answer("Access already verified or request expired.")
+        except Exception as e:
+            logger.error(f"Error approving join request in gate: {e}")
+            await query.answer("Error processing request.")
+            return
+
+        # Mark user as verified in database
+        try:
+            supabase.table("join_logs").update({
+                "status": "verified",
+                "is_verified": True,
+                "verified_at": datetime.now(timezone.utc).isoformat()
+            }).eq("chat_id", target_chat_id).eq("user_id", user.id).execute()
+        except Exception as e:
+            logger.error(f"Error updating verified join_log: {e}")
+
+        # Edit gate message in-place to the full Welcome Card
+        ch_res = supabase.table("channels").select("*").eq("chat_id", target_chat_id).execute()
+        channel = ch_res.data[0] if (ch_res.data and len(ch_res.data) > 0) else {}
+        channel_title = channel.get("chat_title", "Community")
+        current_time_str = datetime.now(IST).strftime("%I:%M %p IST")
+
+        if channel.get("event_mode_enabled") and channel.get("event_message"):
+            raw_msg = channel["event_message"]
+        else:
+            raw_msg = channel.get("custom_message") or "Welcome to {channel}! Your request has been approved."
+
+        formatted_msg = (
+            raw_msg.replace("{name}", user.first_name or "there")
+                   .replace("{channel}", channel_title)
+                   .replace("{username}", f"@{user.username}" if user.username else user.first_name or "")
+                   .replace("{time}", current_time_str)
+        )
+
+        final_text = (
+            f"<b>Request Approved for {channel_title}</b>\n\n"
+            f"{formatted_msg}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"Auto-Approved via @{context.bot.username}"
+        )
+
+        keyboard_rows = []
+        btn1_text = channel.get("custom_btn_text") or f"Enter {channel_title}"
+        btn1_url = channel.get("custom_btn_url") or "https://t.me"
+        keyboard_rows.append([InlineKeyboardButton(btn1_text, url=btn1_url)])
+
+        if channel.get("custom_btn_2_text") and channel.get("custom_btn_2_url"):
+            keyboard_rows.append([InlineKeyboardButton(channel["custom_btn_2_text"], url=channel["custom_btn_2_url"])])
+
+        # Dynamic Promo Slot with [Ad] prefix (if promo_slots_enabled is True)
+        if channel.get("promo_slots_enabled", True):
+            try:
+                now_iso = datetime.now(timezone.utc).isoformat()
+                slots_res = supabase.table("promo_slots").select("*").eq("is_active", True).execute()
+                active_slots = slots_res.data or []
+                valid_slots = [
+                    s for s in active_slots
+                    if not (s.get("expires_at") and s["expires_at"] < now_iso)
+                    and not (s.get("click_limit") and (s.get("total_clicks") or 0) >= s["click_limit"])
+                ]
+                if valid_slots:
+                    chosen = random.choice(valid_slots)
+                    if chosen.get("btn_text"):
+                        raw_btn_text = chosen["btn_text"].strip()
+                        ad_btn_text = raw_btn_text if raw_btn_text.startswith("[Ad]") else f"[Ad] {raw_btn_text}"
+                        redirect_url = f"{BACKEND_URL}/r/{chosen['slot_id']}?u={user.id}"
+                        keyboard_rows.append([InlineKeyboardButton(ad_btn_text, url=redirect_url)])
+            except Exception as e:
+                logger.error(f"Error selecting promo slot: {e}")
+
+        markup = InlineKeyboardMarkup(keyboard_rows)
+
+        try:
+            if query.message.photo:
+                await query.edit_message_caption(caption=final_text, parse_mode="HTML", reply_markup=markup)
+            else:
+                await query.edit_message_text(text=final_text, parse_mode="HTML", reply_markup=markup)
+        except Exception as e:
+            logger.error(f"Error editing message after gate verification: {e}")
 
 
 # ============================================================================
@@ -678,7 +842,6 @@ async def handle_private_message(update: Update, context: ContextTypes.DEFAULT_T
     reply_msg = msg.reply_to_message
 
     # CASE A: User/Admin replying to a message sent to them (admin_msg_id)
-    # Checks admin_msg_id first so owner self-testing also works!
     if reply_msg:
         r_admin = supabase.table("admin_message_relays").select("*").eq("admin_msg_id", reply_msg.message_id).execute()
         if r_admin.data and len(r_admin.data) > 0:
@@ -765,38 +928,6 @@ async def handle_private_message(update: Update, context: ContextTypes.DEFAULT_T
         await msg.reply_text("Your message has been delivered to management.")
 
 
-async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    if not query or not query.data:
-        return
-
-    data = query.data
-    user = query.from_user
-
-    if data.startswith("read_"):
-        relay_id = int(data.replace("read_", ""))
-        await query.answer("Marked as read.")
-
-        try:
-            supabase.table("admin_message_relays").update({
-                "has_read_receipt": True,
-                "read_at": datetime.now(timezone.utc).isoformat()
-            }).eq("id", relay_id).execute()
-
-            # Remove button cleanly
-            await query.edit_message_reply_markup(reply_markup=None)
-
-            # Notify owner with IST timestamp
-            notice_text = (
-                f"<b>Read Confirmation</b>\n\n"
-                f"Admin {user.first_name} (@{user.username or user.id}) marked your message as read.\n"
-                f"Time: <code>{datetime.now(IST).strftime('%I:%M:%S %p IST')}</code>"
-            )
-            await context.bot.send_message(chat_id=OWNER_ID, text=notice_text, parse_mode="HTML")
-        except Exception as e:
-            logger.error(f"Error handling read callback: {e}")
-
-
 # ============================================================================
 # FASTAPI LIFESPAN & ENGINE INITIALIZATION
 # ============================================================================
@@ -874,6 +1005,7 @@ class ChannelUpdatePayload(BaseModel):
     event_message: Optional[str] = None
     silent_dm: Optional[bool] = False
     anti_bot_enabled: Optional[bool] = True
+    approval_mode: Optional[str] = "instant"
 
 class TestDmPayload(BaseModel):
     chat_id: int
@@ -989,6 +1121,8 @@ class ChannelOverridePayload(BaseModel):
     custom_btn_2_url: Optional[str] = ""
     banner_file_id: Optional[str] = None
     is_active: bool
+    approval_mode: Optional[str] = "instant"
+    promo_slots_enabled: Optional[bool] = True
 
 class SubscriberBroadcastPayload(BaseModel):
     admin_id: int
@@ -1058,6 +1192,7 @@ async def get_admin_channels(admin_id: int):
             ch["joins_30d"] = h_stats["joins_30d"]
             ch["joins_90d"] = h_stats["joins_90d"]
             ch["subscriber_count"] = h_stats["subscriber_count"]
+            ch["verified_subscribers"] = h_stats["verified_subscribers"]
 
         return {"success": True, "is_owner": is_owner, "channels": channels}
     except Exception as e:
@@ -1103,7 +1238,8 @@ async def update_channel_config(payload: ChannelUpdatePayload):
             "event_mode_enabled": payload.event_mode_enabled,
             "event_message": payload.event_message,
             "silent_dm": payload.silent_dm,
-            "anti_bot_enabled": payload.anti_bot_enabled
+            "anti_bot_enabled": payload.anti_bot_enabled,
+            "approval_mode": payload.approval_mode or "instant"
         }
         supabase.table("channels").update(update_dict).eq("chat_id", payload.chat_id).execute()
         return {"success": True}
@@ -1346,7 +1482,6 @@ async def get_owner_promotions(admin_id: int):
 
 @app.post("/api/owner/promotions/test-preview")
 async def owner_test_preview_ad(payload: PromoOwnerTestPreviewPayload):
-    """Sends exact rendered ad preview to owner chat for content inspection."""
     verify_owner(payload.admin_id)
     if not tg_application:
         raise HTTPException(status_code=503, detail="Telegram engine offline")
@@ -1401,7 +1536,6 @@ async def owner_test_preview_ad(payload: PromoOwnerTestPreviewPayload):
 
 @app.post("/api/owner/audience-count")
 async def calculate_audience_count(payload: AudienceCountQueryPayload):
-    """Calculates deduplicated unique audience count across selected channel IDs."""
     verify_owner(payload.admin_id)
     try:
         if not payload.chat_ids:
@@ -1512,8 +1646,14 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
                                 delivered += 1
                             except Forbidden:
                                 blocked += 1
-                            except Exception:
-                                blocked += 1
+                                try:
+                                    supabase.table("join_logs").update({"status": "blocked"}).eq("user_id", target_uid).execute()
+                                except Exception:
+                                    pass
+                            except BadRequest as e:
+                                logger.warning(f"Broadcast BadRequest for {target_uid}: {e}")
+                            except Exception as e:
+                                logger.error(f"Broadcast general error for {target_uid}: {e}")
 
                             if j_id and (delivered + blocked) % 20 == 0:
                                 try:
@@ -1546,7 +1686,7 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
                                 f"• Campaign: <b>{target_info}</b>\n"
                                 f"• Total Queued: <b>{len(user_ids)}</b>\n"
                                 f"• Delivered: <b>{delivered}</b>\n"
-                                f"• Blocked / Inactive: <b>{blocked}</b>\n"
+                                f"• Blocked: <b>{blocked}</b>\n"
                                 f"• Delivery Rate: <b>{success_pct}%</b>\n"
                                 f"• Completed At: <code>{datetime.now(IST).strftime('%I:%M:%S %p IST, %d %b %Y')}</code>"
                             )
@@ -1590,6 +1730,7 @@ async def get_owner_dashboard_data(admin_id: int):
             c["joins_30d"] = c_stats["joins_30d"]
             c["joins_90d"] = c_stats["joins_90d"]
             c["subscriber_count"] = c_stats["subscriber_count"]
+            c["verified_subscribers"] = c_stats["verified_subscribers"]
 
         promo_flag = await get_promotion_portal_flag()
 
@@ -1649,13 +1790,15 @@ async def get_owner_admins(admin_id: int):
                     "channels_count": 0,
                     "joins_24h": 0,
                     "joins_30d": 0,
-                    "joins_90d": 0
+                    "joins_90d": 0,
+                    "verified_subscribers": 0
                 }
             admins_map[aid]["channels_count"] += 1
             c_stats = compute_horizon_stats(c.get("chat_id"))
             admins_map[aid]["joins_24h"] += c_stats["joins_24h"]
             admins_map[aid]["joins_30d"] += c_stats["joins_30d"]
             admins_map[aid]["joins_90d"] += c_stats["joins_90d"]
+            admins_map[aid]["verified_subscribers"] += c_stats["verified_subscribers"]
 
         return {"success": True, "admins": list(admins_map.values())}
     except Exception as e:
@@ -1673,6 +1816,7 @@ async def get_admin_inspection_detail(admin_id: int, target_admin_id: int):
             c["joins_30d"] = c_stats["joins_30d"]
             c["joins_90d"] = c_stats["joins_90d"]
             c["subscriber_count"] = c_stats["subscriber_count"]
+            c["verified_subscribers"] = c_stats["verified_subscribers"]
 
         return {"success": True, "target_admin_id": target_admin_id, "channels": channels}
     except Exception as e:
@@ -1682,15 +1826,18 @@ async def get_admin_inspection_detail(admin_id: int, target_admin_id: int):
 async def override_admin_channel(payload: ChannelOverridePayload):
     verify_owner(payload.admin_id)
     try:
-        supabase.table("channels").update({
+        update_data = {
             "custom_message": payload.custom_message,
             "custom_btn_text": payload.custom_btn_text,
             "custom_btn_url": payload.custom_btn_url,
             "custom_btn_2_text": payload.custom_btn_2_text,
             "custom_btn_2_url": payload.custom_btn_2_url,
             "banner_file_id": payload.banner_file_id,
-            "is_active": payload.is_active
-        }).eq("chat_id", payload.target_chat_id).execute()
+            "is_active": payload.is_active,
+            "approval_mode": payload.approval_mode or "instant",
+            "promo_slots_enabled": payload.promo_slots_enabled if payload.promo_slots_enabled is not None else True
+        }
+        supabase.table("channels").update(update_data).eq("chat_id", payload.target_chat_id).execute()
         return {"success": True, "message": "Channel updated."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1721,15 +1868,15 @@ async def export_subscribers_csv(admin_id: int):
         raise HTTPException(status_code=503, detail="Telegram engine offline")
 
     try:
-        res = supabase.table("view_unique_subscribers").select("*").execute()
+        res = supabase.table("join_logs").select("*").order("created_at", desc=True).execute()
         rows = res.data or []
 
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["User ID", "Username", "First Name", "First Channel Joined", "Admin ID", "Joined Timestamp IST"])
+        writer.writerow(["User ID", "Username", "First Name", "Channel ID", "Campaign Name", "Status", "Is Verified", "Joined Time IST"])
 
         for r in rows:
-            created_utc = r.get("first_joined_at", "")
+            created_utc = r.get("created_at", "")
             time_display = ""
             if created_utc:
                 try:
@@ -1742,8 +1889,10 @@ async def export_subscribers_csv(admin_id: int):
                 r.get("user_id"),
                 f"@{r.get('username')}" if r.get("username") else "",
                 r.get("first_name", ""),
-                r.get("first_joined_channel_title", ""),
-                r.get("channel_admin_id", ""),
+                r.get("chat_id", ""),
+                r.get("invite_link_name", ""),
+                r.get("status", "passive"),
+                "YES" if r.get("is_verified") else "NO",
                 time_display
             ])
 
@@ -1755,7 +1904,7 @@ async def export_subscribers_csv(admin_id: int):
         await tg_application.bot.send_document(
             chat_id=admin_id,
             document=doc,
-            caption=f"Audience Vault CSV: {len(rows)} unique subscribers.\nGenerated: {datetime.now(IST).strftime('%d %b %Y, %I:%M %p IST')}",
+            caption=f"Audience Vault CSV: {len(rows)} subscribers.\nGenerated: {datetime.now(IST).strftime('%d %b %Y, %I:%M %p IST')}",
             parse_mode="HTML"
         )
         return {"success": True, "count": len(rows), "message": "CSV delivered to your Telegram chat."}
@@ -1814,8 +1963,14 @@ async def broadcast_subscribers(payload: SubscriberBroadcastPayload, background_
                         delivered += 1
                     except Forbidden:
                         blocked += 1
-                    except Exception:
-                        blocked += 1
+                        try:
+                            supabase.table("join_logs").update({"status": "blocked"}).eq("user_id", target_uid).execute()
+                        except Exception:
+                            pass
+                    except BadRequest as e:
+                        logger.warning(f"Broadcast BadRequest for {target_uid}: {e}")
+                    except Exception as e:
+                        logger.error(f"Broadcast error for {target_uid}: {e}")
 
                     if j_id and (delivered + blocked) % 20 == 0:
                         try:
@@ -1848,7 +2003,7 @@ async def broadcast_subscribers(payload: SubscriberBroadcastPayload, background_
                         f"• Target Segment: <b>{seg_name}</b>\n"
                         f"• Total Queued: <b>{len(uids)}</b>\n"
                         f"• Delivered: <b>{delivered}</b>\n"
-                        f"• Blocked / Inactive: <b>{blocked}</b>\n"
+                        f"• Blocked: <b>{blocked}</b>\n"
                         f"• Delivery Rate: <b>{rate}%</b>\n"
                         f"• Completed At: <code>{datetime.now(IST).strftime('%I:%M:%S %p IST, %d %b %Y')}</code>"
                     )
@@ -1903,7 +2058,6 @@ async def toggle_channel_status(payload: ChannelTogglePayload):
 
 @app.post("/api/owner/direct-message")
 async def direct_message_admin(payload: DirectMessagePayload):
-    """Sends message from owner to admin with support for the /read confirmation trigger."""
     verify_owner(payload.admin_id)
     if not tg_application:
         raise HTTPException(status_code=503, detail="Telegram engine offline")
@@ -2060,8 +2214,14 @@ async def handle_migration_action(payload: MigrationActionPayload, background_ta
                         delivered += 1
                     except Forbidden:
                         blocked += 1
-                    except Exception:
-                        blocked += 1
+                        try:
+                            supabase.table("join_logs").update({"status": "blocked"}).eq("user_id", target_uid).execute()
+                        except Exception:
+                            pass
+                    except BadRequest as e:
+                        logger.warning(f"Migration BadRequest for {target_uid}: {e}")
+                    except Exception as e:
+                        logger.error(f"Migration error for {target_uid}: {e}")
 
                     if j_id and (delivered + blocked) % 20 == 0:
                         try:
@@ -2094,7 +2254,7 @@ async def handle_migration_action(payload: MigrationActionPayload, background_ta
                         f"• Community: <b>{req_data['channel_title']}</b>\n"
                         f"• Enqueued: <b>{len(user_list)}</b>\n"
                         f"• Delivered: <b>{delivered}</b>\n"
-                        f"• Blocked / Inactive: <b>{blocked}</b>\n"
+                        f"• Blocked: <b>{blocked}</b>\n"
                         f"• Success Rate: <b>{rate}%</b>\n"
                         f"• Completed At: <code>{datetime.now(IST).strftime('%I:%M:%S %p IST, %d %b %Y')}</code>"
                     )
