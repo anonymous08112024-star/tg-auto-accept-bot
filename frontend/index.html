@@ -16,10 +16,64 @@
 </head>
 <body class="p-4 pb-28 max-w-lg mx-auto">
 
+  <!-- REUSABLE VECTOR LOGO COMPONENT DEFINITION -->
+  <svg class="hidden">
+    <defs>
+      <radialGradient id="logoBadgeBg" cx="50%" cy="40%" r="75%">
+        <stop offset="0%" stop-color="#141D45"></stop>
+        <stop offset="55%" stop-color="#0A1032"></stop>
+        <stop offset="100%" stop-color="#04061A"></stop>
+      </radialGradient>
+      <linearGradient id="logoBadgeEdge" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#6070C0"></stop>
+        <stop offset="50%" stop-color="#1B2552"></stop>
+        <stop offset="100%" stop-color="#0B1028"></stop>
+      </linearGradient>
+      <linearGradient id="logoRibbon" x1="52" y1="270" x2="348" y2="130" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="#3F37C9"></stop>
+        <stop offset="22%" stop-color="#2F6BFF"></stop>
+        <stop offset="50%" stop-color="#A24BFF"></stop>
+        <stop offset="78%" stop-color="#36B6FF"></stop>
+        <stop offset="100%" stop-color="#5CFBFF"></stop>
+      </linearGradient>
+      <linearGradient id="logoRim" x1="52" y1="270" x2="348" y2="130" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="#8C86FF"></stop>
+        <stop offset="22%" stop-color="#8FB0FF"></stop>
+        <stop offset="50%" stop-color="#E3B0FF"></stop>
+        <stop offset="78%" stop-color="#A5E4FF"></stop>
+        <stop offset="100%" stop-color="#DBFFFF"></stop>
+      </linearGradient>
+      <filter id="logoShadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="6"></feGaussianBlur>
+      </filter>
+      <filter id="logoGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="9"></feGaussianBlur>
+      </filter>
+      <g id="appIconGraphic">
+        <circle cx="200" cy="200" r="180" fill="url(#logoBadgeBg)"></circle>
+        <circle cx="200" cy="200" r="158" fill="none" stroke="#5C6BFF" stroke-opacity="0.3" stroke-width="1" stroke-dasharray="1.5 7"></circle>
+        <circle cx="200" cy="200" r="134" fill="none" stroke="#4C5CFF" stroke-opacity="0.13" stroke-width="1"></circle>
+        <circle cx="200" cy="200" r="108" fill="none" stroke="#4C5CFF" stroke-opacity="0.09" stroke-width="1"></circle>
+        <circle cx="200" cy="200" r="179" fill="none" stroke="url(#logoBadgeEdge)" stroke-width="2.5"></circle>
+        <g transform="translate(200 200) scale(0.86) translate(-200 -200)">
+          <path d="M240 142C212 168 160 220 128 252C100 282 52 262 52 200C52 138 100 118 128 148C160 180 212 232 240 258C254 274 276 284 286 262C300 232 326 176 348 126" fill="none" stroke="#000000" stroke-opacity="0.6" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" filter="url(#logoShadow)" transform="translate(0 12)"></path>
+          <path d="M240 142C212 168 160 220 128 252C100 282 52 262 52 200C52 138 100 118 128 148C160 180 212 232 240 258C254 274 276 284 286 262C300 232 326 176 348 126" fill="none" stroke="url(#logoRibbon)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round" opacity="0.5" filter="url(#logoGlow)"></path>
+          <path d="M240 142C212 168 160 220 128 252C100 282 52 262 52 200C52 138 100 118 128 148C160 180 212 232 240 258C254 274 276 284 286 262C300 232 326 176 348 126" fill="none" stroke="url(#logoRim)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"></path>
+          <path d="M240 142C212 168 160 220 128 252C100 282 52 262 52 200C52 138 100 118 128 148C160 180 212 232 240 258C254 274 276 284 286 262C300 232 326 176 348 126" fill="none" stroke="url(#logoRibbon)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"></path>
+          <path d="M240 142C212 168 160 220 128 252C100 282 52 262 52 200C52 138 100 118 128 148C160 180 212 232 240 258C254 274 276 284 286 262C300 232 326 176 348 126" fill="none" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" transform="translate(-3 -4)"></path>
+          <path d="M155 175C175 195 197 216 215 234" fill="none" stroke="#070B1E" stroke-opacity="0.9" stroke-width="31"></path>
+          <path d="M155 175C175 195 197 216 215 234" fill="none" stroke="url(#logoRim)" stroke-width="26"></path>
+          <path d="M155 175C175 195 197 216 215 234" fill="none" stroke="url(#logoRibbon)" stroke-width="22"></path>
+          <path d="M155 175C175 195 197 216 215 234" fill="none" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="4" transform="translate(-3 -4)"></path>
+        </g>
+      </g>
+    </defs>
+  </svg>
+
   <!-- ACCESS RESTRICTED SCREEN -->
   <div id="unauthorizedScreen" class="hidden py-20 text-center space-y-4">
-    <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-2xl text-rose-400">
-      Lock
+    <div class="flex justify-center">
+      <svg viewBox="0 0 400 400" class="w-16 h-16 drop-shadow-lg"><use href="#appIconGraphic"></use></svg>
     </div>
     <div class="space-y-1.5 px-4">
       <h2 class="text-base font-bold text-white tracking-tight">Access Restricted</h2>
@@ -37,13 +91,16 @@
   <!-- MAIN APP CONTAINER -->
   <div id="appContainer" class="hidden">
     
-    <!-- Top Bar -->
+    <!-- Top Bar with Official Logo -->
     <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-      <div>
-        <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
-          Control Center
-        </h1>
-        <p class="text-[11px] text-slate-400" id="headerSubtitle">@AutoRequestAcceptorxBot Hub</p>
+      <div class="flex items-center gap-2.5">
+        <svg viewBox="0 0 400 400" class="w-8 h-8 shrink-0 drop-shadow"><use href="#appIconGraphic"></use></svg>
+        <div>
+          <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-1.5">
+            Control Center
+          </h1>
+          <p class="text-[11px] text-slate-400" id="headerSubtitle">@AutoRequestAcceptorxBot Hub</p>
+        </div>
       </div>
       <span id="roleBadge" class="text-[11px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full font-medium">
         Admin
@@ -51,9 +108,11 @@
     </div>
 
     <!-- Loading State -->
-    <div id="loading" class="py-12 text-center text-slate-400 text-sm">
-      <div class="inline-block animate-spin rounded-full h-7 w-7 border-b-2 border-blue-500 mb-3"></div>
-      <p>Syncing secure channel records...</p>
+    <div id="loading" class="py-16 text-center text-slate-400 text-sm space-y-3">
+      <div class="flex justify-center">
+        <svg viewBox="0 0 400 400" class="w-12 h-12 animate-pulse"><use href="#appIconGraphic"></use></svg>
+      </div>
+      <p class="text-xs">Syncing secure channel records...</p>
     </div>
 
     <!-- ========================================== -->
@@ -87,8 +146,8 @@
           <select id="channelSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500"></select>
         </div>
 
-        <!-- Metrics Matrix -->
-        <div class="grid grid-cols-3 gap-2 bg-slate-900/70 border border-slate-800 p-3 rounded-2xl text-center">
+        <!-- Audience Vault Telemetry Matrix -->
+        <div class="grid grid-cols-4 gap-2 bg-slate-900/70 border border-slate-800 p-3 rounded-2xl text-center">
           <div>
             <p class="text-[10px] text-slate-400">Last 24h</p>
             <p class="text-sm font-bold text-blue-400 mt-0.5" id="cJoins24h">0</p>
@@ -98,8 +157,38 @@
             <p class="text-sm font-bold text-emerald-400 mt-0.5" id="cJoins30d">0</p>
           </div>
           <div>
-            <p class="text-[10px] text-slate-400">90 Days</p>
-            <p class="text-sm font-bold text-amber-400 mt-0.5" id="cJoins90d">0</p>
+            <p class="text-[10px] text-slate-400">Approved</p>
+            <p class="text-sm font-bold text-amber-400 mt-0.5" id="cJoinsTotal">0</p>
+          </div>
+          <div>
+            <p class="text-[10px] text-purple-400 font-semibold">Active Vault</p>
+            <p class="text-sm font-bold text-purple-300 mt-0.5" id="cJoinsVerified">0</p>
+          </div>
+        </div>
+
+        <!-- Approval Engine Mode Selector -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+          <div>
+            <h4 class="text-xs font-semibold text-white">Approval Engine Mode</h4>
+            <p class="text-[10px] text-slate-400">Choose how joining users are processed and verified</p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" id="btnModeInstant" onclick="setApprovalMode('instant')" class="py-2.5 px-3 rounded-xl border border-blue-500/50 bg-blue-500/20 text-blue-300 text-xs font-semibold transition-all text-left">
+              <span class="block font-bold">Instant Pass</span>
+              <span class="text-[10px] text-slate-300 font-normal">Frictionless entry</span>
+            </button>
+            <button type="button" id="btnModeVaultGate" onclick="setApprovalMode('vault_gate')" class="py-2.5 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold transition-all text-left">
+              <span class="block font-bold">Vault Gate</span>
+              <span class="text-[10px] text-slate-400 font-normal">Ban-protected</span>
+            </button>
+          </div>
+
+          <!-- Explanation Note -->
+          <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 text-[11px] text-slate-300 space-y-1.5 leading-relaxed">
+            <p id="modeExplanationText">
+              <b>Instant Pass (Default):</b> Users are approved instantly in under 50ms upon request. Frictionless entry for maximum subscriber velocity.
+            </p>
           </div>
         </div>
 
@@ -127,7 +216,7 @@
 
         <!-- Approval Card Live Preview -->
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Approval Card Preview</label>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Card Preview</label>
           <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 shadow-xl">
             <div class="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50 space-y-2.5">
               <div id="previewBannerBadge" class="hidden bg-blue-500/20 text-blue-300 text-[10px] px-2.5 py-1 rounded-md text-center font-semibold">
@@ -143,7 +232,7 @@
                 <button id="previewBtn2" class="hidden w-full py-2 px-3 text-xs font-medium text-center bg-slate-700/80 text-white rounded-lg pointer-events-none truncate">
                   Secondary Button
                 </button>
-                <button disabled class="w-full py-2 px-3 text-xs font-medium text-center bg-slate-800 text-slate-300 border border-slate-700 rounded-lg opacity-85 cursor-not-allowed truncate">
+                <button disabled id="previewBtnSlot" class="w-full py-2 px-3 text-xs font-medium text-center bg-slate-800 text-slate-300 border border-slate-700 rounded-lg opacity-85 cursor-not-allowed truncate">
                   [Ad] Sponsored Slot
                 </button>
               </div>
@@ -414,21 +503,26 @@
       </div>
 
       <!-- Horizon Telemetry Matrix -->
-      <div class="grid grid-cols-3 gap-2.5">
+      <div class="grid grid-cols-4 gap-2">
         <div class="bg-slate-900 border border-slate-800 p-3 rounded-2xl text-center">
-          <p class="text-[11px] font-medium text-slate-400">Last 24h</p>
-          <p class="text-lg font-bold text-blue-400 mt-1" id="m24hJoins">0</p>
-          <span class="text-[9px] text-blue-300">Daily velocity</span>
+          <p class="text-[10px] font-medium text-slate-400">Last 24h</p>
+          <p class="text-base font-bold text-blue-400 mt-1" id="m24hJoins">0</p>
+          <span class="text-[8px] text-blue-300">Daily velocity</span>
         </div>
         <div class="bg-slate-900 border border-slate-800 p-3 rounded-2xl text-center">
-          <p class="text-[11px] font-medium text-slate-400">30-Day Joins</p>
-          <p class="text-lg font-bold text-emerald-400 mt-1" id="m30dJoins">0</p>
-          <span class="text-[9px] text-emerald-300">Monthly volume</span>
+          <p class="text-[10px] font-medium text-slate-400">30-Day Joins</p>
+          <p class="text-base font-bold text-emerald-400 mt-1" id="m30dJoins">0</p>
+          <span class="text-[8px] text-emerald-300">Monthly volume</span>
         </div>
         <div class="bg-slate-900 border border-slate-800 p-3 rounded-2xl text-center">
-          <p class="text-[11px] font-medium text-slate-400">90-Day Joins</p>
-          <p class="text-lg font-bold text-amber-400 mt-1" id="m90dJoins">0</p>
-          <span class="text-[9px] text-amber-300">Quarterly reach</span>
+          <p class="text-[10px] font-medium text-slate-400">Total Approved</p>
+          <p class="text-base font-bold text-amber-400 mt-1" id="mTotalJoins">0</p>
+          <span class="text-[8px] text-amber-300">Gross audience</span>
+        </div>
+        <div class="bg-slate-900 border border-purple-900/40 p-3 rounded-2xl text-center">
+          <p class="text-[10px] font-medium text-purple-400">Active Vault</p>
+          <p class="text-base font-bold text-purple-300 mt-1" id="mVerifiedJoins">0</p>
+          <span class="text-[8px] text-purple-400">Verified reach</span>
         </div>
       </div>
 
@@ -483,7 +577,7 @@
           <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Communities & Health Sentinel</h3>
           <span class="text-[11px] text-slate-500" id="channelCountLabel">0 Communities</span>
         </div>
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y border-slate-800 divide-slate-800 max-h-64 overflow-y-auto" id="masterChannelList"></div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800 max-h-64 overflow-y-auto" id="masterChannelList"></div>
       </div>
 
       <!-- Admins Directory -->
@@ -623,7 +717,7 @@
     </div>
   </div>
 
-  <!-- MODAL: ADMIN INSPECTION -->
+  <!-- MODAL: ADMIN INSPECTION (OWNER AUDIT) -->
   <div id="adminInspectModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -637,7 +731,7 @@
     </div>
   </div>
 
-  <!-- MODAL: DYNAMIC DEFAULTS -->
+  <!-- MODAL: GLOBAL DEFAULTS (OWNER HQ) -->
   <div id="defaultsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -648,6 +742,13 @@
         <button onclick="closeDefaultsModal()" class="text-slate-400 hover:text-white text-lg font-bold px-2">✕</button>
       </div>
       <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Default Approval Mode</label>
+          <select id="defApprovalMode" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+            <option value="instant">Instant Pass (Frictionless)</option>
+            <option value="vault_gate">Vault Gate (Ban-Protected)</option>
+          </select>
+        </div>
         <div>
           <label class="block text-[11px] font-medium text-slate-400 mb-1">Default Welcome Message</label>
           <textarea id="defCustomMsg" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"></textarea>
@@ -661,6 +762,10 @@
             <label class="block text-[11px] font-medium text-slate-400 mb-1">Button 1 URL</label>
             <input type="url" id="defBtn1Url" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500" placeholder="https://t.me">
           </div>
+        </div>
+        <div class="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+          <span class="text-amber-300 font-medium">Enable Promo Slot [Ad] by Default</span>
+          <input type="checkbox" id="defPromoSlots" class="accent-amber-500 h-4 w-4">
         </div>
         <div class="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
           <span>Anti-Bot Shield Enabled by Default</span>
@@ -772,7 +877,12 @@
 
     const cJoins24h = document.getElementById("cJoins24h");
     const cJoins30d = document.getElementById("cJoins30d");
-    const cJoins90d = document.getElementById("cJoins90d");
+    const cJoinsTotal = document.getElementById("cJoinsTotal");
+    const cJoinsVerified = document.getElementById("cJoinsVerified");
+
+    const btnModeInstant = document.getElementById("btnModeInstant");
+    const btnModeVaultGate = document.getElementById("btnModeVaultGate");
+    const modeExplanationText = document.getElementById("modeExplanationText");
 
     const customMessage = document.getElementById("customMessage");
     const btn1Text = document.getElementById("btn1Text");
@@ -791,6 +901,7 @@
     const previewMessage = document.getElementById("previewMessage");
     const previewBtn1 = document.getElementById("previewBtn1");
     const previewBtn2 = document.getElementById("previewBtn2");
+    const previewBtnSlot = document.getElementById("previewBtnSlot");
 
     const saveBtn = document.getElementById("saveBtn");
     const testDmBtn = document.getElementById("testDmBtn");
@@ -825,7 +936,8 @@
     const liveJobsContainer = document.getElementById("liveJobsContainer");
     const m24hJoins = document.getElementById("m24hJoins");
     const m30dJoins = document.getElementById("m30dJoins");
-    const m90dJoins = document.getElementById("m90dJoins");
+    const mTotalJoins = document.getElementById("mTotalJoins");
+    const mVerifiedJoins = document.getElementById("mVerifiedJoins");
     const exportCsvBtn = document.getElementById("exportCsvBtn");
     const openDefaultsModalBtn = document.getElementById("openDefaultsModalBtn");
     const openSubBroadcastBtn = document.getElementById("openSubBroadcastBtn");
@@ -853,9 +965,11 @@
     const inspectChannelsList = document.getElementById("inspectChannelsList");
 
     const defaultsModal = document.getElementById("defaultsModal");
+    const defApprovalMode = document.getElementById("defApprovalMode");
     const defCustomMsg = document.getElementById("defCustomMsg");
     const defBtn1Text = document.getElementById("defBtn1Text");
     const defBtn1Url = document.getElementById("defBtn1Url");
+    const defPromoSlots = document.getElementById("defPromoSlots");
     const defAntiBot = document.getElementById("defAntiBot");
     const defSilentDm = document.getElementById("defSilentDm");
     const saveDefaultsBtn = document.getElementById("saveDefaultsBtn");
@@ -871,14 +985,12 @@
     const broadBtnUrl = document.getElementById("broadBtnUrl");
     const dispatchSubBroadcastBtn = document.getElementById("dispatchSubBroadcastBtn");
 
-    // Multi Target Approval Modal
     const multiTargetModal = document.getElementById("multiTargetModal");
     const channelCheckboxesList = document.getElementById("channelCheckboxesList");
     const liveTargetAudienceCount = document.getElementById("liveTargetAudienceCount");
     const confirmTargetDispatchBtn = document.getElementById("confirmTargetDispatchBtn");
     const multiTargetSubtitle = document.getElementById("multiTargetSubtitle");
 
-    // Promo Settings Modal
     const promoSettingsModal = document.getElementById("promoSettingsModal");
     const setNoticeText = document.getElementById("setNoticeText");
     const slotPackagesInputsContainer = document.getElementById("slotPackagesInputsContainer");
@@ -887,6 +999,7 @@
     let isOwner = false;
     let myChannels = [];
     let currentChannel = null;
+    let currentApprovalMode = "instant";
     let promoSlots = [];
     let allOwnerChannels = [];
     let selectedPromoType = "slot";
@@ -916,7 +1029,6 @@
       }
     }
 
-    // Auto-Save Promo Draft Locally (Preserves entries when attaching photos)
     window.savePromoDraftLocally = function() {
       const draft = {
         community_name: promoCommunityName.value,
@@ -946,7 +1058,6 @@
       }
     };
 
-    // Tab Navigation Logic
     window.switchTab = function(tab) {
       tabHomeContent.classList.add("hidden");
       tabPromoteContent.classList.add("hidden");
@@ -1102,7 +1213,10 @@
 
       cJoins24h.innerText = "+" + (currentChannel.joins_24h || 0);
       cJoins30d.innerText = currentChannel.joins_30d || 0;
-      cJoins90d.innerText = currentChannel.joins_90d || 0;
+      cJoinsTotal.innerText = currentChannel.subscriber_count || 0;
+      cJoinsVerified.innerText = currentChannel.verified_subscribers || 0;
+
+      setApprovalMode(currentChannel.approval_mode || "instant", false);
 
       customMessage.value = currentChannel.custom_message || "Welcome to {channel}! Your access request has been approved.";
       btn1Text.value = currentChannel.custom_btn_text || `Enter ${currentChannel.chat_title}`;
@@ -1120,6 +1234,20 @@
       updatePreview();
       loadAnalytics(currentChannel.chat_id);
     }
+
+    window.setApprovalMode = function(mode, triggerPreview = true) {
+      currentApprovalMode = mode;
+      if (mode === "instant") {
+        btnModeInstant.className = "py-2.5 px-3 rounded-xl border border-blue-500/50 bg-blue-500/20 text-blue-300 text-xs font-semibold transition-all text-left";
+        btnModeVaultGate.className = "py-2.5 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold transition-all text-left";
+        modeExplanationText.innerHTML = "<b>Instant Pass (Default):</b> Users are approved instantly in under 50ms upon request. Frictionless entry for maximum subscriber velocity.";
+      } else {
+        btnModeVaultGate.className = "py-2.5 px-3 rounded-xl border border-purple-500/50 bg-purple-500/20 text-purple-300 text-xs font-semibold transition-all text-left";
+        btnModeInstant.className = "py-2.5 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold transition-all text-left";
+        modeExplanationText.innerHTML = "<b>Vault Gate (Ban-Protected):</b> Requests remain pending while delivering a branded access pass. Tapping <i>Claim VIP Pass</i> approves the user and establishes 100% permanent disaster-recovery reach.";
+      }
+      if (triggerPreview) updatePreview();
+    };
 
     function updateBannerUI() {
       if (currentChannel.banner_file_id) {
@@ -1149,6 +1277,15 @@
     function updatePreview() {
       if (!currentChannel) return;
 
+      if (currentApprovalMode === "vault_gate") {
+        previewTitle.innerText = `Access Verification: ${currentChannel.chat_title}`;
+        previewMessage.innerText = `Hello ${user.first_name || 'there'}! Tap the button below to confirm your request and unlock entry to ${currentChannel.chat_title}.\n\n🛡️ This activates your disaster recovery backup channel insurance.`;
+        previewBtn1.innerText = "⚡ Claim VIP Pass & Enter Channel";
+        previewBtn2.classList.add("hidden");
+        previewBtnSlot.classList.add("hidden");
+        return;
+      }
+
       previewTitle.innerText = `Request Approved for ${currentChannel.chat_title}`;
 
       if (eventModeToggle.checked && eventMessage.value.trim()) {
@@ -1170,6 +1307,12 @@
         previewBtn2.classList.remove("hidden");
       } else {
         previewBtn2.classList.add("hidden");
+      }
+
+      if (currentChannel.promo_slots_enabled !== false) {
+        previewBtnSlot.classList.remove("hidden");
+      } else {
+        previewBtnSlot.classList.add("hidden");
       }
     }
 
@@ -1234,7 +1377,8 @@
         event_mode_enabled: eventModeToggle.checked,
         event_message: eventMessage.value.trim(),
         silent_dm: silentDmToggle.checked,
-        anti_bot_enabled: antiBotToggle.checked
+        anti_bot_enabled: antiBotToggle.checked,
+        approval_mode: currentApprovalMode
       };
 
       try {
@@ -1592,7 +1736,8 @@
 
         m24hJoins.innerText = "+" + (data.metrics.joins_24h || 0).toLocaleString();
         m30dJoins.innerText = (data.metrics.joins_30d || 0).toLocaleString();
-        m90dJoins.innerText = (data.metrics.joins_90d || 0).toLocaleString();
+        mTotalJoins.innerText = (data.metrics.subscriber_count || 0).toLocaleString();
+        mVerifiedJoins.innerText = (data.metrics.verified_subscribers || 0).toLocaleString();
 
         flagPromoPortalToggle.checked = !!data.promotion_portal_enabled;
 
@@ -1645,18 +1790,23 @@
           </div>
         `).join("");
 
-        // Master Channels Directory
+        // Master Channels Directory with Dual Metric & Mode Badges
         masterChannelList.innerHTML = allOwnerChannels.map(ch => {
           const isHealthy = ch.is_active;
           const badgeClass = isHealthy ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' : 'border-rose-500/30 text-rose-400 bg-rose-500/10';
-          const badgeText = isHealthy ? 'Active' : 'Action Required';
+          const badgeText = isHealthy ? 'Active' : 'Paused';
+          const isGate = ch.approval_mode === 'vault_gate';
 
           return `
             <div class="p-3 flex items-center justify-between gap-3 text-xs">
               <div class="truncate">
-                <p class="font-semibold text-white truncate">${ch.chat_title}</p>
-                <p class="text-[10px] text-slate-400">
-                  24h: <span class="text-blue-400">+${ch.joins_24h || 0}</span> • Subs: <span class="text-amber-400 font-medium">${ch.subscriber_count || 0}</span>
+                <div class="flex items-center gap-1.5">
+                  <p class="font-semibold text-white truncate">${ch.chat_title}</p>
+                  <span class="text-[9px] px-1.5 py-0.2 rounded font-mono ${isGate ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-blue-500/10 text-blue-400'}">${isGate ? 'Vault Gate' : 'Instant'}</span>
+                  ${ch.promo_slots_enabled === false ? '<span class="text-[9px] bg-rose-500/20 text-rose-300 px-1 rounded">No-Ad</span>' : ''}
+                </div>
+                <p class="text-[10px] text-slate-400 mt-0.5">
+                  24h: <span class="text-blue-400">+${ch.joins_24h || 0}</span> • Total: <span class="text-amber-400 font-medium">${ch.subscriber_count || 0}</span> • Vault: <span class="text-purple-400 font-medium">${ch.verified_subscribers || 0}</span>
                 </p>
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
@@ -1706,7 +1856,6 @@
       }
     });
 
-    // Live Jobs Poller
     function startLiveTrackerPoller() {
       if (liveTrackerInterval) clearInterval(liveTrackerInterval);
       liveTrackerInterval = setInterval(refreshLiveJobs, 4000);
@@ -1772,7 +1921,6 @@
       }
     };
 
-    // Promotion Applications Review in Owner HQ
     async function loadPendingPromotions() {
       try {
         const res = await fetch(`${BACKEND_URL}/api/owner/promotions/${user.id}?t=${Date.now()}`, {
@@ -1903,7 +2051,6 @@
       }
     };
 
-    // Multi-Community Targeting Modal
     function openMultiTargetModal(appId) {
       currentApprovingAppId = appId;
       multiTargetSubtitle.innerText = "Select specific communities to dispatch this broadcast";
@@ -1985,7 +2132,6 @@
       }
     }
 
-    // Promo Packages Settings Modal (Gear Icon)
     window.openPromoSettingsModal = function() {
       if (!promoConfig) return;
       setNoticeText.value = promoConfig.rules_notice || "";
@@ -2066,12 +2212,12 @@
             <div class="truncate">
               <p class="font-semibold text-white truncate">${admin.username}</p>
               <p class="text-[10px] text-slate-400">
-                ${admin.channels_count} Ch • 24h: <span class="text-blue-400">+${admin.joins_24h || 0}</span> • 30d: <span class="text-emerald-400">${admin.joins_30d || 0}</span>
+                ${admin.channels_count} Ch • 24h: <span class="text-blue-400">+${admin.joins_24h || 0}</span> • Vault: <span class="text-purple-400 font-semibold">${admin.verified_subscribers || 0}</span>
               </p>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
               <button onclick="inspectAdmin(${admin.admin_id})" class="text-[10px] px-2.5 py-1 rounded-lg font-medium bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white transition-all">
-                Inspect
+                Audit
               </button>
               <button onclick="directMessageAdmin(${admin.admin_id})" class="text-[10px] px-2.5 py-1 rounded-lg font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700">
                 DM
@@ -2084,6 +2230,7 @@
       }
     }
 
+    // Owner Audit Modal with Mode & Promo Slots Overrides
     window.inspectAdmin = async function(targetAdminId) {
       inspectAdminTitle.innerText = `Admin ID: ${targetAdminId}`;
       inspectChannelsList.innerHTML = `<p class="text-slate-500 text-xs">Loading admin records...</p>`;
@@ -2105,11 +2252,28 @@
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
               <div>
                 <p class="text-xs font-bold text-white">${ch.chat_title}</p>
-                <p class="text-[10px] text-slate-400">ID: ${ch.chat_id} • 24h: <span class="text-blue-400">+${ch.joins_24h || 0}</span> • Subs: ${ch.subscriber_count || 0}</p>
+                <p class="text-[10px] text-slate-400">ID: ${ch.chat_id} • Total: <span class="text-amber-400">${ch.subscriber_count || 0}</span> • Vault: <span class="text-purple-400 font-semibold">${ch.verified_subscribers || 0}</span></p>
               </div>
               <a href="${ch.custom_btn_url || 'https://t.me'}" target="_blank" class="text-[10px] px-2.5 py-1 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold">
                 Link
               </a>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-[11px]">
+              <div>
+                <label class="block text-[10px] font-medium text-slate-400 mb-0.5">Approval Mode</label>
+                <select id="ovMode_${ch.chat_id}" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-white">
+                  <option value="instant" ${ch.approval_mode !== 'vault_gate' ? 'selected' : ''}>Instant Pass</option>
+                  <option value="vault_gate" ${ch.approval_mode === 'vault_gate' ? 'selected' : ''}>Vault Gate</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[10px] font-medium text-slate-400 mb-0.5">Sponsored [Ad] Slot</label>
+                <select id="ovSlots_${ch.chat_id}" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-white">
+                  <option value="true" ${ch.promo_slots_enabled !== false ? 'selected' : ''}>Enabled (Ad visible)</option>
+                  <option value="false" ${ch.promo_slots_enabled === false ? 'selected' : ''}>Disabled (No ads)</option>
+                </select>
+              </div>
             </div>
 
             <div class="space-y-1.5">
@@ -2153,7 +2317,9 @@
         custom_message: document.getElementById(`ovMsg_${chatId}`).value.trim(),
         custom_btn_text: document.getElementById(`ovBtn1Text_${chatId}`).value.trim(),
         custom_btn_url: document.getElementById(`ovBtn1Url_${chatId}`).value.trim(),
-        is_active: document.getElementById(`ovActive_${chatId}`).checked
+        is_active: document.getElementById(`ovActive_${chatId}`).checked,
+        approval_mode: document.getElementById(`ovMode_${chatId}`).value,
+        promo_slots_enabled: document.getElementById(`ovSlots_${chatId}`).value === "true"
       };
 
       try {
@@ -2165,6 +2331,7 @@
         const result = await res.json();
         if (result.success) {
           alert("Community configuration updated.");
+          loadOwnerDashboard();
         } else {
           alert("Error: " + (result.error || ""));
         }
@@ -2412,7 +2579,7 @@
       }
     });
 
-    // Defaults Modal
+    // Defaults Modal (Owner HQ)
     openDefaultsModalBtn.addEventListener("click", async () => {
       defaultsModal.classList.remove("hidden");
       try {
@@ -2422,9 +2589,11 @@
         });
         const data = await res.json();
         if (data.success && data.defaults) {
+          defApprovalMode.value = data.defaults.approval_mode || "instant";
           defCustomMsg.value = data.defaults.custom_message || "";
           defBtn1Text.value = data.defaults.custom_btn_text || "";
           defBtn1Url.value = data.defaults.custom_btn_url || "";
+          defPromoSlots.checked = data.defaults.promo_slots_enabled !== false;
           defAntiBot.checked = !!data.defaults.anti_bot_enabled;
           defSilentDm.checked = !!data.defaults.silent_dm;
         }
@@ -2442,9 +2611,11 @@
       const payload = {
         admin_id: user.id,
         defaults: {
+          approval_mode: defApprovalMode.value,
           custom_message: defCustomMsg.value.trim(),
           custom_btn_text: defBtn1Text.value.trim(),
           custom_btn_url: defBtn1Url.value.trim(),
+          promo_slots_enabled: defPromoSlots.checked,
           anti_bot_enabled: defAntiBot.checked,
           silent_dm: defSilentDm.checked
         }
