@@ -144,7 +144,7 @@
                   Secondary Button
                 </button>
                 <button disabled class="w-full py-2 px-3 text-xs font-medium text-center bg-slate-800 text-slate-300 border border-slate-700 rounded-lg opacity-85 cursor-not-allowed truncate">
-                  Sponsored Slot
+                  [Ad] Sponsored Slot
                 </button>
               </div>
               <p class="text-[10px] text-slate-400 text-center font-medium">Auto-Approved via @AutoRequestAcceptorxBot</p>
@@ -297,34 +297,14 @@
           </div>
         </div>
 
-        <div>
-          <label class="block text-[11px] font-medium text-slate-400 mb-1">Your Community / Brand Name</label>
-          <input type="text" id="promoCommunityName" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="e.g. Cinema Hub">
-        </div>
-
-        <div>
-          <label class="block text-[11px] font-medium text-slate-400 mb-1">Destination URL / Channel Link</label>
-          <input type="url" id="promoUrl" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="https://t.me/...">
-        </div>
-
-        <div>
-          <label class="block text-[11px] font-medium text-slate-400 mb-1">Inline Button Title</label>
-          <input type="text" id="promoBtnText" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="e.g. Join VIP Community">
-        </div>
-
-        <!-- Conditional Direct DM Broadcast Fields -->
-        <div id="promoBroadcastFields" class="hidden space-y-3 pt-2 border-t border-slate-800">
-          <div>
-            <label class="block text-[11px] font-medium text-amber-400 mb-1">Broadcast Message Body (HTML Supported)</label>
-            <textarea id="promoBroadcastMessage" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="Enter message text to be delivered to subscribers' private DMs..."></textarea>
-          </div>
-
-          <!-- Native Ad Photo Attachment -->
+        <!-- CONDITIONAL BROADCAST SECTION: PHOTO ATTACHMENT PLACED FIRST -->
+        <div id="promoBroadcastPhotoSection" class="hidden space-y-2 pt-1 border-t border-slate-800">
+          <label class="block text-[11px] font-semibold text-amber-400">Step 1: Broadcast Photo Attachment</label>
           <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2 text-xs">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <span id="adPhotoIndicator" class="h-2 w-2 rounded-full bg-slate-600"></span>
-                <span id="adPhotoStatusText" class="text-slate-300">Photo: None</span>
+                <span id="adPhotoStatusText" class="text-slate-300">Photo: None attached</span>
               </div>
               <div class="flex items-center gap-2">
                 <button type="button" onclick="attachAdPhoto()" class="text-[11px] font-semibold text-blue-400 hover:text-blue-300">
@@ -343,13 +323,35 @@
         </div>
 
         <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Your Community / Brand Name</label>
+          <input type="text" id="promoCommunityName" oninput="savePromoDraftLocally()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="e.g. Cinema Hub">
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Destination URL / Channel Link</label>
+          <input type="url" id="promoUrl" oninput="savePromoDraftLocally()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="https://t.me/...">
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Inline Button Title</label>
+          <input type="text" id="promoBtnText" oninput="savePromoDraftLocally()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="e.g. Join VIP Community">
+          <p class="text-[10px] text-slate-500 mt-1">Note: Clean <code class="text-amber-400">[Ad]</code> tag is automatically appended to ensure user trust.</p>
+        </div>
+
+        <!-- Conditional Broadcast Message Body -->
+        <div id="promoBroadcastMessageSection" class="hidden space-y-1.5 pt-1 border-t border-slate-800">
+          <label class="block text-[11px] font-medium text-amber-400">Broadcast Message Body (HTML Supported)</label>
+          <textarea id="promoBroadcastMessage" oninput="savePromoDraftLocally()" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="Enter message text to be delivered to subscribers' private DMs..."></textarea>
+        </div>
+
+        <div>
           <label class="block text-[11px] font-medium text-slate-400 mb-1">Select Package & Pricing</label>
-          <select id="promoDuration" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"></select>
+          <select id="promoDuration" onchange="savePromoDraftLocally()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"></select>
         </div>
 
         <div>
           <label class="block text-[11px] font-medium text-slate-400 mb-1">Notes / Pitch to Management</label>
-          <textarea id="promoPitch" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="Targeting preferences or specific requirements..."></textarea>
+          <textarea id="promoPitch" oninput="savePromoDraftLocally()" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="Targeting preferences or specific requirements..."></textarea>
         </div>
 
         <div class="space-y-2 pt-1 border-t border-slate-800">
@@ -393,7 +395,7 @@
       <div id="liveTrackerCard" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <span class="inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
             <h3 class="text-xs font-bold text-white tracking-tight">Live Delivery Sentinel</h3>
           </div>
           <div class="flex items-center gap-2.5">
@@ -532,9 +534,7 @@
     </div>
   </nav>
 
-  <!-- ========================================== -->
-  <!-- MODAL: PROMO PACKAGES & PRICING SETTINGS   -->
-  <!-- ========================================== -->
+  <!-- MODAL: PROMO PACKAGES & PRICING SETTINGS -->
   <div id="promoSettingsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -566,9 +566,7 @@
     </div>
   </div>
 
-  <!-- ========================================== -->
   <!-- MODAL: MULTI-COMMUNITY BROADCAST TARGETING -->
-  <!-- ========================================== -->
   <div id="multiTargetModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto flex items-center justify-center">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -807,7 +805,8 @@
     const promoCommunityName = document.getElementById("promoCommunityName");
     const promoUrl = document.getElementById("promoUrl");
     const promoBtnText = document.getElementById("promoBtnText");
-    const promoBroadcastFields = document.getElementById("promoBroadcastFields");
+    const promoBroadcastPhotoSection = document.getElementById("promoBroadcastPhotoSection");
+    const promoBroadcastMessageSection = document.getElementById("promoBroadcastMessageSection");
     const promoBroadcastMessage = document.getElementById("promoBroadcastMessage");
     const adPhotoIndicator = document.getElementById("adPhotoIndicator");
     const adPhotoStatusText = document.getElementById("adPhotoStatusText");
@@ -877,6 +876,7 @@
     const channelCheckboxesList = document.getElementById("channelCheckboxesList");
     const liveTargetAudienceCount = document.getElementById("liveTargetAudienceCount");
     const confirmTargetDispatchBtn = document.getElementById("confirmTargetDispatchBtn");
+    const multiTargetSubtitle = document.getElementById("multiTargetSubtitle");
 
     // Promo Settings Modal
     const promoSettingsModal = document.getElementById("promoSettingsModal");
@@ -902,6 +902,49 @@
         "X-Telegram-Init-Data": rawInitData
       };
     }
+
+    function getLocalISTTime() {
+      try {
+        return new Date().toLocaleTimeString('en-US', {
+          timeZone: 'Asia/Kolkata',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        }) + ' IST';
+      } catch (e) {
+        return "12:00 PM IST";
+      }
+    }
+
+    // Auto-Save Promo Draft Locally (Preserves entries when attaching photos)
+    window.savePromoDraftLocally = function() {
+      const draft = {
+        community_name: promoCommunityName.value,
+        destination_url: promoUrl.value,
+        button_text: promoBtnText.value,
+        broadcast_message: promoBroadcastMessage.value,
+        pitch: promoPitch.value,
+        duration: promoDuration.value,
+        promo_type: selectedPromoType
+      };
+      localStorage.setItem("promo_form_draft", JSON.stringify(draft));
+    };
+
+    window.restorePromoDraftLocally = function() {
+      try {
+        const raw = localStorage.getItem("promo_form_draft");
+        if (!raw) return;
+        const draft = JSON.parse(raw);
+        if (draft.community_name) promoCommunityName.value = draft.community_name;
+        if (draft.destination_url) promoUrl.value = draft.destination_url;
+        if (draft.button_text) promoBtnText.value = draft.button_text;
+        if (draft.broadcast_message) promoBroadcastMessage.value = draft.broadcast_message;
+        if (draft.pitch) promoPitch.value = draft.pitch;
+        if (draft.duration) promoDuration.value = draft.duration;
+      } catch (e) {
+        console.error("Draft restore error:", e);
+      }
+    };
 
     // Tab Navigation Logic
     window.switchTab = function(tab) {
@@ -930,6 +973,7 @@
         navPromoteBtn.classList.remove("text-slate-400");
         checkAdDraftPhoto();
         renderPublicPromoPackages();
+        restorePromoDraftLocally();
       } else if (tab === "owner" && isOwner) {
         tabOwnerContent.classList.remove("hidden");
         navOwnerBtn.classList.add("text-amber-400", "font-semibold");
@@ -1110,11 +1154,13 @@
       if (eventModeToggle.checked && eventMessage.value.trim()) {
         previewMessage.innerText = eventMessage.value.trim()
           .replace("{name}", user.first_name || "there")
-          .replace("{channel}", currentChannel.chat_title);
+          .replace("{channel}", currentChannel.chat_title)
+          .replace("{time}", getLocalISTTime());
       } else {
         previewMessage.innerText = (customMessage.value.trim() || "Welcome to {channel}!")
           .replace("{name}", user.first_name || "there")
-          .replace("{channel}", currentChannel.chat_title);
+          .replace("{channel}", currentChannel.chat_title)
+          .replace("{time}", getLocalISTTime());
       }
 
       previewBtn1.innerText = btn1Text.value.trim() || `Enter ${currentChannel.chat_title}`;
@@ -1380,14 +1426,17 @@
       if (type === "slot") {
         btnTypeSlot.className = "py-2.5 px-3 rounded-xl border border-amber-500/50 bg-amber-500/20 text-amber-300 text-xs font-semibold transition-all";
         btnTypeBroadcast.className = "py-2.5 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold transition-all";
-        promoBroadcastFields.classList.add("hidden");
+        promoBroadcastPhotoSection.classList.add("hidden");
+        promoBroadcastMessageSection.classList.add("hidden");
       } else {
         btnTypeBroadcast.className = "py-2.5 px-3 rounded-xl border border-amber-500/50 bg-amber-500/20 text-amber-300 text-xs font-semibold transition-all";
         btnTypeSlot.className = "py-2.5 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold transition-all";
-        promoBroadcastFields.classList.remove("hidden");
+        promoBroadcastPhotoSection.classList.remove("hidden");
+        promoBroadcastMessageSection.classList.remove("hidden");
         checkAdDraftPhoto();
       }
       renderPublicPromoPackages();
+      savePromoDraftLocally();
     };
 
     async function checkAdDraftPhoto() {
@@ -1406,7 +1455,7 @@
           removeAdPhotoSeparator.classList.remove("hidden");
         } else {
           adPhotoIndicator.className = "h-2 w-2 rounded-full bg-slate-600";
-          adPhotoStatusText.innerText = "Photo: None";
+          adPhotoStatusText.innerText = "Photo: None attached";
           adPhotoPreviewContainer.classList.add("hidden");
           removeAdPhotoBtn.classList.add("hidden");
           removeAdPhotoSeparator.classList.add("hidden");
@@ -1417,6 +1466,7 @@
     }
 
     window.attachAdPhoto = function() {
+      savePromoDraftLocally();
       const botDeepLink = `https://t.me/AutoRequestAcceptorxBot?start=setadphoto_${user.id}`;
       if (tg && tg.openTelegramLink) {
         tg.openTelegramLink(botDeepLink);
@@ -1511,6 +1561,7 @@
         if (result.success) {
           tg?.HapticFeedback?.notificationOccurred("success");
           alert("Promotion application submitted. Management has been notified.");
+          localStorage.removeItem("promo_form_draft");
           promoCommunityName.value = "";
           promoUrl.value = "";
           promoBtnText.value = "";
