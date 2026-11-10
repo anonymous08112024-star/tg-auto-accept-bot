@@ -83,7 +83,7 @@
     </div>
     <div class="pt-2">
       <div class="inline-block bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-[11px] text-slate-300">
-        Open <b class="text-blue-400">@AutoRequestAcceptorxBot</b> and tap <code class="bg-slate-800 px-1.5 py-0.5 rounded text-amber-300">Dashboard</code>
+        Open <b class="text-blue-400">@BoldAcceptorBot</b> and tap <code class="bg-slate-800 px-1.5 py-0.5 rounded text-amber-300">Dashboard</code>
       </div>
     </div>
   </div>
@@ -99,7 +99,7 @@
           <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-1.5">
             Control Center
           </h1>
-          <p class="text-[11px] text-slate-400" id="headerSubtitle">@AutoRequestAcceptorxBot Hub</p>
+          <p class="text-[11px] text-slate-400" id="headerSubtitle">@BoldAcceptorBot Hub</p>
         </div>
       </div>
       <span id="roleBadge" class="text-[11px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full font-medium">
@@ -124,7 +124,7 @@
       <div id="noChannels" class="hidden bg-slate-900/60 border border-slate-800 rounded-2xl p-6 text-center">
         <h3 class="text-sm font-semibold text-white mb-1">No Communities Connected</h3>
         <p class="text-xs text-slate-400 leading-relaxed">
-          Add <b>@AutoRequestAcceptorxBot</b> as an <b>Administrator</b> with <i>Invite Users via Link</i> enabled in your channel to begin.
+          Add <b>@BoldAcceptorBot</b> as an <b>Administrator</b> with <i>Invite Users via Link</i> enabled in your channel to begin.
         </p>
       </div>
 
@@ -242,7 +242,7 @@
                   Sponsored Slot
                 </button>
               </div>
-              <p class="text-[10px] text-slate-400 text-center font-medium">Auto-Approved via @AutoRequestAcceptorxBot</p>
+              <p class="text-[10px] text-slate-400 text-center font-medium">Auto-Approved via @BoldAcceptorBot</p>
             </div>
           </div>
         </div>
@@ -1355,7 +1355,7 @@
 
     setBannerBtn.addEventListener("click", () => {
       if (!currentChannel) return;
-      const botDeepLink = `https://t.me/AutoRequestAcceptorxBot?start=setbanner_${currentChannel.chat_id}`;
+      const botDeepLink = `https://t.me/BoldAcceptorBot?start=setbanner_${currentChannel.chat_id}`;
       if (tg && tg.openTelegramLink) {
         tg.openTelegramLink(botDeepLink);
         tg.close();
@@ -1366,7 +1366,7 @@
 
     removeBannerBtn.addEventListener("click", () => {
       if (!currentChannel || !confirm("Remove media banner and revert to clean text?")) return;
-      const botDeepLink = `https://t.me/AutoRequestAcceptorxBot?start=removebanner_${currentChannel.chat_id}`;
+      const botDeepLink = `https://t.me/BoldAcceptorBot?start=removebanner_${currentChannel.chat_id}`;
       if (tg && tg.openTelegramLink) {
         tg.openTelegramLink(botDeepLink);
         tg.close();
@@ -1619,7 +1619,7 @@
 
     window.attachAdPhoto = function() {
       savePromoDraftLocally();
-      const botDeepLink = `https://t.me/AutoRequestAcceptorxBot?start=setadphoto_${user.id}`;
+      const botDeepLink = `https://t.me/BoldAcceptorBot?start=setadphoto_${user.id}`;
       if (tg && tg.openTelegramLink) {
         tg.openTelegramLink(botDeepLink);
         tg.close();
