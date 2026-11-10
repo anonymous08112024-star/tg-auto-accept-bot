@@ -78,6 +78,31 @@ async def add_cache_headers(request: Request, call_next):
     return response
 
 # ============================================================================
+# UNIVERSAL MEDIA SENDER HELPER (Photos, GIFs, Videos)
+# ============================================================================
+async def send_media_helper(bot, chat_id: int, media_id: str, caption: str, reply_markup=None, disable_notification=False):
+    """Parses media type from our custom file_id syntax (type|id) and sends the correct Telegram media."""
+    parts = media_id.split("|", 1)
+    m_type = parts[0] if len(parts) > 1 else "photo"
+    f_id = parts[1] if len(parts) > 1 else media_id
+    
+    if m_type in ["anim", "animation"]:
+        return await bot.send_animation(
+            chat_id=chat_id, animation=f_id, caption=caption, 
+            parse_mode="HTML", reply_markup=reply_markup, disable_notification=disable_notification
+        )
+    elif m_type == "video":
+        return await bot.send_video(
+            chat_id=chat_id, video=f_id, caption=caption, 
+            parse_mode="HTML", reply_markup=reply_markup, disable_notification=disable_notification
+        )
+    else:
+        return await bot.send_photo(
+            chat_id=chat_id, photo=f_id, caption=caption, 
+            parse_mode="HTML", reply_markup=reply_markup, disable_notification=disable_notification
+        )
+
+# ============================================================================
 # HEALTH & KEEPALIVE WORKERS
 # ============================================================================
 @app.get("/")
@@ -133,6 +158,7 @@ async def get_system_channel_defaults() -> Dict[str, Any]:
         "custom_btn_url": "",
         "custom_btn_2_text": "",
         "custom_btn_2_url": "",
+        "vault_button_text": "⚡ Activate VIP Pass & Channel Access",
         "silent_dm": False,
         "anti_bot_enabled": True,
         "event_mode_enabled": False,
@@ -164,14 +190,11 @@ async def get_promo_packages_config() -> Dict[str, Any]:
     fallback = {
         "slot_packages": [
             {"id": "slot_7d", "title": "7 Days Dynamic Slot", "price": "₹299", "duration_days": 7, "click_limit": None},
-            {"id": "slot_14d", "title": "14 Days Dynamic Slot", "price": "₹499", "duration_days": 14, "click_limit": None},
-            {"id": "slot_30d", "title": "30 Days Dynamic Slot", "price": "₹899", "duration_days": 30, "click_limit": None},
-            {"id": "slot_500c", "title": "500 Verified Clicks", "price": "₹499", "duration_days": None, "click_limit": 500}
+            {"id": "slot_14d", "title": "14 Days Dynamic Slot", "price": "₹499", "duration_days": 14, "click_limit": None}
         ],
         "broadcast_packages": [
             {"id": "broad_500", "title": "Targeted Reach (500 Subs)", "price": "₹299", "reach": 500},
-            {"id": "broad_1000", "title": "Targeted Reach (1,000 Subs)", "price": "₹499", "reach": 1000},
-            {"id": "broad_all", "title": "Full Network Vault Broadcast", "price": "₹999", "reach": "all"}
+            {"id": "broad_1000", "title": "Targeted Reach (1,000 Subs)", "price": "₹499", "reach": 1000}
         ],
         "rules_notice": "Promotions are reviewed and verified by management before scheduling."
     }
@@ -248,7 +271,10 @@ async def get_media_preview(file_id: str):
     if not tg_application:
         raise HTTPException(status_code=503, detail="Bot engine offline")
     try:
-        tg_file = await tg_application.bot.get_file(file_id)
+        parts = file_id.split("|", 1)
+        actual_id = parts[1] if len(parts) > 1 else file_id
+        
+        tg_file = await tg_application.bot.get_file(actual_id)
         file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{tg_file.file_path}"
         return RedirectResponse(url=file_url, status_code=307)
     except Exception as e:
@@ -299,7 +325,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_channel_id = args[0].replace("setbanner_", "")
         context.user_data["awaiting_banner_for"] = target_channel_id
         await update.message.reply_text(
-            f"Send the banner photo you want to attach for channel ID: <code>{target_channel_id}</code>.\n\n"
+            f"Send the media (Photo, GIF, or Video) you want to attach for channel ID: <code>{target_channel_id}</code>.\n\n"
             "The image will be linked automatically.",
             parse_mode="HTML"
         )
@@ -308,15 +334,15 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if args and args[0].startswith("removebanner_"):
         target_channel_id = args[0].replace("removebanner_", "")
         supabase.table("channels").update({"banner_file_id": None}).eq("chat_id", int(target_channel_id)).execute()
-        await update.message.reply_text("Photo banner removed. Approval cards reverted to text format.")
+        await update.message.reply_text("Media banner removed. Approval cards reverted to text format.")
         return
 
     if args and args[0].startswith("setadphoto_"):
         target_user_id = args[0].replace("setadphoto_", "")
         context.user_data["awaiting_ad_photo_for"] = target_user_id
         await update.message.reply_text(
-            "Send the photo you want to attach to your promotional broadcast.\n\n"
-            "The photo will be saved to your ad draft.",
+            "Send the media (Photo or GIF) you want to attach to your promotional broadcast.\n\n"
+            "The file will be saved to your ad draft.",
             parse_mode="HTML"
         )
         return
@@ -324,7 +350,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if args and args[0].startswith("removeadphoto_"):
         target_user_id = int(args[0].replace("removeadphoto_", ""))
         supabase.table("ad_drafts").delete().eq("user_id", target_user_id).execute()
-        await update.message.reply_text("Promotional banner photo removed from draft.")
+        await update.message.reply_text("Promotional media removed from draft.")
         return
 
     welcome_text = (
@@ -369,22 +395,36 @@ async def cmd_mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="HTML", reply_markup=keyboard)
 
 
-async def handle_banner_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_banner_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles incoming media (Photo, Animation/GIF, Video) and formats it securely."""
     user_id = update.effective_user.id
-    if not update.message.photo:
+    
+    file_id = None
+    m_type = "photo"
+    
+    if update.message.photo:
+        file_id = update.message.photo[-1].file_id
+    elif update.message.animation:
+        file_id = update.message.animation.file_id
+        m_type = "anim"
+    elif update.message.video:
+        file_id = update.message.video.file_id
+        m_type = "video"
+        
+    if not file_id:
         return
-
-    photo_file_id = update.message.photo[-1].file_id
+        
+    combined_media_id = f"{m_type}|{file_id}"
 
     if context.user_data.get("awaiting_ad_photo_for"):
         supabase.table("ad_drafts").upsert({
             "user_id": user_id,
-            "banner_file_id": photo_file_id,
+            "banner_file_id": combined_media_id,
             "updated_at": datetime.now(timezone.utc).isoformat()
         }).execute()
         del context.user_data["awaiting_ad_photo_for"]
         await update.message.reply_text(
-            "Promotional photo attached.\n\n"
+            "Promotional media attached.\n\n"
             "Return to the Promote tab in your dashboard to preview and submit.",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("Open Dashboard", web_app=WebAppInfo(url=DASHBOARD_URL))]
@@ -404,9 +444,9 @@ async def handle_banner_photo(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text("Unauthorized: You do not own this channel.")
             return
 
-        supabase.table("channels").update({"banner_file_id": photo_file_id}).eq("chat_id", int(target_channel_id)).execute()
+        supabase.table("channels").update({"banner_file_id": combined_media_id}).eq("chat_id", int(target_channel_id)).execute()
         del context.user_data["awaiting_banner_for"]
-        await update.message.reply_text("Photo banner attached. Approval cards will now include this banner.")
+        await update.message.reply_text(f"Media banner attached ({m_type}). Approval cards will now include this banner.")
 
 
 async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -471,6 +511,7 @@ async def chat_member_update_handler(update: Update, context: ContextTypes.DEFAU
                     "custom_btn_url": magic_link or defaults.get("custom_btn_url", ""),
                     "custom_btn_2_text": defaults.get("custom_btn_2_text", ""),
                     "custom_btn_2_url": defaults.get("custom_btn_2_url", ""),
+                    "vault_button_text": defaults.get("vault_button_text", "⚡ Activate VIP Pass & Channel Access"),
                     "silent_dm": defaults.get("silent_dm", False),
                     "anti_bot_enabled": defaults.get("anti_bot_enabled", True),
                     "event_mode_enabled": defaults.get("event_mode_enabled", False),
@@ -539,8 +580,9 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     channel_title = channel.get("chat_title") or (req.chat.title if req.chat else "Community")
     invite_link = req.invite_link
     invite_link_name = invite_link.name if (invite_link and invite_link.name) else "Default / Unnamed"
+    gate_btn_text = channel.get("vault_button_text") or "⚡ Activate VIP Pass & Channel Access"
 
-    # MODE A: VAULT GATE (Requires 1-tap activation to establish permanent broadcast reach)
+    # MODE A: VAULT GATE
     if approval_mode == "vault_gate":
         try:
             supabase.table("join_logs").insert({
@@ -564,29 +606,15 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"Verification Sentinel • @{context.bot.username}"
         )
 
-        # Native Reply Keyboard (Transmits automatically upon single tap)
-        reply_keyboard = ReplyKeyboardMarkup(
-            [["⚡ Activate VIP Pass & Channel Access"]],
-            resize_keyboard=True,
-            one_time_keyboard=True
-        )
-
+        reply_keyboard = ReplyKeyboardMarkup([[gate_btn_text]], resize_keyboard=True, one_time_keyboard=True)
         banner_file_id = channel.get("banner_file_id")
+        
         try:
             if banner_file_id:
-                await context.bot.send_photo(
-                    chat_id=user.id,
-                    photo=banner_file_id,
-                    caption=gate_text,
-                    parse_mode="HTML",
-                    reply_markup=reply_keyboard
-                )
+                await send_media_helper(context.bot, user.id, banner_file_id, gate_text, reply_keyboard)
             else:
                 await context.bot.send_message(
-                    chat_id=user.id,
-                    text=gate_text,
-                    parse_mode="HTML",
-                    reply_markup=reply_keyboard
+                    chat_id=user.id, text=gate_text, parse_mode="HTML", reply_markup=reply_keyboard
                 )
         except Exception as e:
             logger.info(f"Could not deliver vault gate pass to {user.id}: {e}")
@@ -644,7 +672,6 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             if channel.get("custom_btn_2_text") and channel.get("custom_btn_2_url"):
                 keyboard_rows.append([InlineKeyboardButton(channel["custom_btn_2_text"], url=channel["custom_btn_2_url"])])
 
-            # Dynamic Promo Slot with [Ad] prefix (only if promo_slots_enabled is True)
             if channel.get("promo_slots_enabled", True):
                 try:
                     now_iso = datetime.now(timezone.utc).isoformat()
@@ -658,8 +685,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
                     if valid_slots:
                         chosen = random.choice(valid_slots)
                         if chosen.get("btn_text"):
-                            raw_btn_text = chosen["btn_text"].strip()
-                            ad_btn_text = raw_btn_text if raw_btn_text.startswith("[Ad]") else f"[Ad] {raw_btn_text}"
+                            ad_btn_text = chosen["btn_text"].strip()
                             redirect_url = f"{BACKEND_URL}/r/{chosen['slot_id']}?u={user.id}"
                             keyboard_rows.append([InlineKeyboardButton(ad_btn_text, url=redirect_url)])
                 except Exception as e:
@@ -671,21 +697,10 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
 
             try:
                 if banner_file_id:
-                    await context.bot.send_photo(
-                        chat_id=user.id,
-                        photo=banner_file_id,
-                        caption=final_text,
-                        parse_mode="HTML",
-                        reply_markup=markup,
-                        disable_notification=silent
-                    )
+                    await send_media_helper(context.bot, user.id, banner_file_id, final_text, markup, silent)
                 else:
                     await context.bot.send_message(
-                        chat_id=user.id,
-                        text=final_text,
-                        parse_mode="HTML",
-                        reply_markup=markup,
-                        disable_notification=silent
+                        chat_id=user.id, text=final_text, parse_mode="HTML", reply_markup=markup, disable_notification=silent
                     )
             except Forbidden:
                 logger.info(f"User {user.id} has blocked bot or disabled DMs.")
@@ -725,112 +740,105 @@ async def handle_private_message(update: Update, context: ContextTypes.DEFAULT_T
     reply_msg = msg.reply_to_message
 
     # ========================================================================
-    # 1-TAP ACTIVATION DETECTOR: Sent automatically when ReplyKeyboard is tapped
+    # DYNAMIC 1-TAP ACTIVATION DETECTOR
     # ========================================================================
-    if text == "⚡ Activate VIP Pass & Channel Access":
+    p_res = supabase.table("join_logs").select("*").eq("user_id", sender.id).eq("status", "pending").order("created_at", desc=True).execute()
+    pending_requests = p_res.data or []
+    
+    matched_req = None
+    matched_channel = None
+    
+    for req in pending_requests:
+        target_chat_id = req["chat_id"]
+        ch_res = supabase.table("channels").select("*").eq("chat_id", target_chat_id).execute()
+        ch_data = ch_res.data[0] if (ch_res.data and len(ch_res.data) > 0) else {}
+        expected_btn = ch_data.get("vault_button_text") or "⚡ Activate VIP Pass & Channel Access"
+        
+        if text == expected_btn:
+            matched_req = req
+            matched_channel = ch_data
+            break
+
+    if matched_req:
         try:
-            # Look up the latest pending join request for this user
-            p_res = supabase.table("join_logs").select("*").eq("user_id", sender.id).eq("status", "pending").order("created_at", desc=True).limit(1).execute()
+            target_chat_id = matched_req["chat_id"]
             
-            if p_res.data and len(p_res.data) > 0:
-                pending_req = p_res.data[0]
-                target_chat_id = pending_req["chat_id"]
+            try:
+                await context.bot.approve_chat_join_request(chat_id=target_chat_id, user_id=sender.id)
+                logger.info(f"Gate verified & approved via 1-tap: {sender.id} in {target_chat_id}")
+            except BadRequest as e:
+                logger.info(f"Join request already handled: {e}")
+            except Exception as e:
+                logger.error(f"Error approving join request: {e}")
 
-                # Approve the join request
-                try:
-                    await context.bot.approve_chat_join_request(chat_id=target_chat_id, user_id=sender.id)
-                    logger.info(f"Gate verified & approved via 1-tap: {sender.id} in {target_chat_id}")
-                except BadRequest as e:
-                    logger.info(f"Join request already handled: {e}")
-                except Exception as e:
-                    logger.error(f"Error approving join request: {e}")
+            supabase.table("join_logs").update({
+                "status": "verified",
+                "is_verified": True,
+                "verified_at": datetime.now(timezone.utc).isoformat()
+            }).eq("id", matched_req["id"]).execute()
 
-                # Mark as verified in database
-                supabase.table("join_logs").update({
-                    "status": "verified",
-                    "is_verified": True,
-                    "verified_at": datetime.now(timezone.utc).isoformat()
-                }).eq("id", pending_req["id"]).execute()
+            await msg.reply_text("✅ <b>Access Pass Verified!</b> Community unlocked.", parse_mode="HTML", reply_markup=ReplyKeyboardRemove())
 
-                # Cleanly remove the reply keyboard with acknowledgment
-                await msg.reply_text("✅ <b>Access Pass Verified!</b> Community unlocked.", parse_mode="HTML", reply_markup=ReplyKeyboardRemove())
+            channel_title = matched_channel.get("chat_title", "Community")
+            current_time_str = datetime.now(IST).strftime("%I:%M %p IST")
 
-                # Fetch community details and deliver full Welcome Card
-                ch_res = supabase.table("channels").select("*").eq("chat_id", target_chat_id).execute()
-                channel = ch_res.data[0] if (ch_res.data and len(ch_res.data) > 0) else {}
-                channel_title = channel.get("chat_title", "Community")
-                current_time_str = datetime.now(IST).strftime("%I:%M %p IST")
-
-                if channel.get("event_mode_enabled") and channel.get("event_message"):
-                    raw_msg = channel["event_message"]
-                else:
-                    raw_msg = channel.get("custom_message") or "Welcome to {channel}! Your access request has been approved."
-
-                formatted_msg = (
-                    raw_msg.replace("{name}", sender.first_name or "there")
-                           .replace("{channel}", channel_title)
-                           .replace("{username}", f"@{sender.username}" if sender.username else sender.first_name or "")
-                           .replace("{time}", current_time_str)
-                )
-
-                final_text = (
-                    f"<b>Request Approved for {channel_title}</b>\n\n"
-                    f"{formatted_msg}\n\n"
-                    f"━━━━━━━━━━━━━━━━━━━\n"
-                    f"Auto-Approved via @{context.bot.username}"
-                )
-
-                keyboard_rows = []
-                btn1_text = channel.get("custom_btn_text") or f"Enter {channel_title}"
-                btn1_url = channel.get("custom_btn_url") or "https://t.me"
-                keyboard_rows.append([InlineKeyboardButton(btn1_text, url=btn1_url)])
-
-                if channel.get("custom_btn_2_text") and channel.get("custom_btn_2_url"):
-                    keyboard_rows.append([InlineKeyboardButton(channel["custom_btn_2_text"], url=channel["custom_btn_2_url"])])
-
-                if channel.get("promo_slots_enabled", True):
-                    try:
-                        now_iso = datetime.now(timezone.utc).isoformat()
-                        slots_res = supabase.table("promo_slots").select("*").eq("is_active", True).execute()
-                        active_slots = slots_res.data or []
-                        valid_slots = [
-                            s for s in active_slots
-                            if not (s.get("expires_at") and s["expires_at"] < now_iso)
-                            and not (s.get("click_limit") and (s.get("total_clicks") or 0) >= s["click_limit"])
-                        ]
-                        if valid_slots:
-                            chosen = random.choice(valid_slots)
-                            if chosen.get("btn_text"):
-                                raw_btn_text = chosen["btn_text"].strip()
-                                ad_btn_text = raw_btn_text if raw_btn_text.startswith("[Ad]") else f"[Ad] {raw_btn_text}"
-                                redirect_url = f"{BACKEND_URL}/r/{chosen['slot_id']}?u={sender.id}"
-                                keyboard_rows.append([InlineKeyboardButton(ad_btn_text, url=redirect_url)])
-                    except Exception as e:
-                        logger.error(f"Error selecting promo slot: {e}")
-
-                markup = InlineKeyboardMarkup(keyboard_rows)
-                banner_file_id = channel.get("banner_file_id")
-
-                if banner_file_id:
-                    await context.bot.send_photo(
-                        chat_id=sender.id,
-                        photo=banner_file_id,
-                        caption=final_text,
-                        parse_mode="HTML",
-                        reply_markup=markup
-                    )
-                else:
-                    await context.bot.send_message(
-                        chat_id=sender.id,
-                        text=final_text,
-                        parse_mode="HTML",
-                        reply_markup=markup
-                    )
-                return
+            if matched_channel.get("event_mode_enabled") and matched_channel.get("event_message"):
+                raw_msg = matched_channel["event_message"]
             else:
-                # If no pending request exists, ensure the keyboard is still cleanly removed
-                await msg.reply_text("✅ <b>Your pass is already active and verified!</b>", parse_mode="HTML", reply_markup=ReplyKeyboardRemove())
-                return
+                raw_msg = matched_channel.get("custom_message") or "Welcome to {channel}! Your access request has been approved."
+
+            formatted_msg = (
+                raw_msg.replace("{name}", sender.first_name or "there")
+                       .replace("{channel}", channel_title)
+                       .replace("{username}", f"@{sender.username}" if sender.username else sender.first_name or "")
+                       .replace("{time}", current_time_str)
+            )
+
+            final_text = (
+                f"<b>Request Approved for {channel_title}</b>\n\n"
+                f"{formatted_msg}\n\n"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"Auto-Approved via @{context.bot.username}"
+            )
+
+            keyboard_rows = []
+            btn1_text = matched_channel.get("custom_btn_text") or f"Enter {channel_title}"
+            btn1_url = matched_channel.get("custom_btn_url") or "https://t.me"
+            keyboard_rows.append([InlineKeyboardButton(btn1_text, url=btn1_url)])
+
+            if matched_channel.get("custom_btn_2_text") and matched_channel.get("custom_btn_2_url"):
+                keyboard_rows.append([InlineKeyboardButton(matched_channel["custom_btn_2_text"], url=matched_channel["custom_btn_2_url"])])
+
+            if matched_channel.get("promo_slots_enabled", True):
+                try:
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    slots_res = supabase.table("promo_slots").select("*").eq("is_active", True).execute()
+                    active_slots = slots_res.data or []
+                    valid_slots = [
+                        s for s in active_slots
+                        if not (s.get("expires_at") and s["expires_at"] < now_iso)
+                        and not (s.get("click_limit") and (s.get("total_clicks") or 0) >= s["click_limit"])
+                    ]
+                    if valid_slots:
+                        chosen = random.choice(valid_slots)
+                        if chosen.get("btn_text"):
+                            ad_btn_text = chosen["btn_text"].strip()
+                            redirect_url = f"{BACKEND_URL}/r/{chosen['slot_id']}?u={sender.id}"
+                            keyboard_rows.append([InlineKeyboardButton(ad_btn_text, url=redirect_url)])
+                except Exception as e:
+                    logger.error(f"Error selecting promo slot: {e}")
+
+            markup = InlineKeyboardMarkup(keyboard_rows)
+            banner_file_id = matched_channel.get("banner_file_id")
+
+            if banner_file_id:
+                await send_media_helper(context.bot, sender.id, banner_file_id, final_text, markup)
+            else:
+                await context.bot.send_message(
+                    chat_id=sender.id, text=final_text, parse_mode="HTML", reply_markup=markup
+                )
+            return
+
         except Exception as e:
             logger.error(f"Error processing 1-tap activation: {e}")
             await msg.reply_text("✅ <b>Access verified.</b>", reply_markup=ReplyKeyboardRemove())
@@ -976,7 +984,8 @@ async def startup_event():
     tg_application.add_handler(CommandHandler("mystats", cmd_mystats))
     tg_application.add_handler(ChatMemberHandler(chat_member_update_handler, ChatMemberHandler.MY_CHAT_MEMBER))
     tg_application.add_handler(ChatJoinRequestHandler(handle_join_request))
-    tg_application.add_handler(MessageHandler(filters.PHOTO, handle_banner_photo))
+    # Note: Added ANIMATION and VIDEO to support rich media banners
+    tg_application.add_handler(MessageHandler(filters.PHOTO | filters.ANIMATION | filters.VIDEO, handle_banner_media))
     tg_application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_private_message))
     tg_application.add_handler(CallbackQueryHandler(handle_callback_query))
 
@@ -1030,6 +1039,7 @@ class ChannelUpdatePayload(BaseModel):
     custom_btn_url: Optional[str] = None
     custom_btn_2_text: Optional[str] = None
     custom_btn_2_url: Optional[str] = None
+    vault_button_text: Optional[str] = None
     event_mode_enabled: Optional[bool] = False
     event_message: Optional[str] = None
     silent_dm: Optional[bool] = False
@@ -1148,6 +1158,7 @@ class ChannelOverridePayload(BaseModel):
     custom_btn_url: str
     custom_btn_2_text: Optional[str] = ""
     custom_btn_2_url: Optional[str] = ""
+    vault_button_text: Optional[str] = None
     banner_file_id: Optional[str] = None
     is_active: bool
     approval_mode: Optional[str] = "instant"
@@ -1270,6 +1281,9 @@ async def update_channel_config(payload: ChannelUpdatePayload):
             "anti_bot_enabled": payload.anti_bot_enabled,
             "approval_mode": payload.approval_mode or "instant"
         }
+        if payload.vault_button_text is not None:
+            update_dict["vault_button_text"] = payload.vault_button_text
+            
         supabase.table("channels").update(update_dict).eq("chat_id", payload.chat_id).execute()
         return {"success": True}
     except Exception as e:
@@ -1312,19 +1326,10 @@ async def send_test_dm(payload: TestDmPayload):
 
     try:
         if channel.get("banner_file_id"):
-            await tg_application.bot.send_photo(
-                chat_id=payload.admin_id,
-                photo=channel["banner_file_id"],
-                caption=text,
-                parse_mode="HTML",
-                reply_markup=markup
-            )
+            await send_media_helper(tg_application.bot, payload.admin_id, channel["banner_file_id"], text, markup)
         else:
             await tg_application.bot.send_message(
-                chat_id=payload.admin_id,
-                text=text,
-                parse_mode="HTML",
-                reply_markup=markup
+                chat_id=payload.admin_id, text=text, parse_mode="HTML", reply_markup=markup
             )
         return {"success": True}
     except Exception as e:
@@ -1407,8 +1412,7 @@ async def send_promo_test_preview(payload: PromoTestDmPayload):
 
         markup = None
         if payload.button_text and payload.destination_url:
-            raw_btn = payload.button_text.strip()
-            ad_label = raw_btn if raw_btn.startswith("[Ad]") else f"[Ad] {raw_btn}"
+            ad_label = payload.button_text.strip() # NO FORCED [Ad]
             markup = InlineKeyboardMarkup([[InlineKeyboardButton(ad_label, url=payload.destination_url)]])
 
         if payload.promo_type == "broadcast":
@@ -1428,19 +1432,10 @@ async def send_promo_test_preview(payload: PromoTestDmPayload):
             )
 
         if banner_file_id and payload.promo_type == "broadcast":
-            await tg_application.bot.send_photo(
-                chat_id=payload.admin_id,
-                photo=banner_file_id,
-                caption=text,
-                parse_mode="HTML",
-                reply_markup=markup
-            )
+            await send_media_helper(tg_application.bot, payload.admin_id, banner_file_id, text, markup)
         else:
             await tg_application.bot.send_message(
-                chat_id=payload.admin_id,
-                text=text,
-                parse_mode="HTML",
-                reply_markup=markup
+                chat_id=payload.admin_id, text=text, parse_mode="HTML", reply_markup=markup
             )
 
         return {"success": True, "message": "Preview delivered to your Telegram chat."}
@@ -1477,7 +1472,7 @@ async def submit_promotion_application(payload: PromotionApplyPayload):
         if tg_application:
             admin_disp = f"@{payload.admin_username.lstrip('@')}" if payload.admin_username else f"ID: {payload.admin_id}"
             type_disp = "Slot Promotion" if payload.promo_type == "slot" else "Direct DM Broadcast"
-            photo_tag = " [Photo Attached]" if banner_file_id else ""
+            photo_tag = " [Media Attached]" if banner_file_id else ""
             alert_text = (
                 f"<b>New Promotion Application</b>\n\n"
                 f"• Type: <b>{type_disp}{photo_tag}</b>\n"
@@ -1523,8 +1518,7 @@ async def owner_test_preview_ad(payload: PromoOwnerTestPreviewPayload):
         appl = app_res.data[0]
         markup = None
         if appl.get("button_text") and appl.get("destination_url"):
-            raw_btn = appl["button_text"].strip()
-            ad_label = raw_btn if raw_btn.startswith("[Ad]") else f"[Ad] {raw_btn}"
+            ad_label = appl["button_text"].strip()
             markup = InlineKeyboardMarkup([[InlineKeyboardButton(ad_label, url=appl["destination_url"])]])
 
         if appl["promo_type"] == "broadcast":
@@ -1544,19 +1538,10 @@ async def owner_test_preview_ad(payload: PromoOwnerTestPreviewPayload):
             )
 
         if appl.get("banner_file_id"):
-            await tg_application.bot.send_photo(
-                chat_id=OWNER_ID,
-                photo=appl["banner_file_id"],
-                caption=text,
-                parse_mode="HTML",
-                reply_markup=markup
-            )
+            await send_media_helper(tg_application.bot, OWNER_ID, appl["banner_file_id"], text, markup)
         else:
             await tg_application.bot.send_message(
-                chat_id=OWNER_ID,
-                text=text,
-                parse_mode="HTML",
-                reply_markup=markup
+                chat_id=OWNER_ID, text=text, parse_mode="HTML", reply_markup=markup
             )
 
         return {"success": True, "message": "Preview delivered to your Telegram DM."}
@@ -1602,8 +1587,7 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
             assigned_slot = payload.assigned_slot_id or 1
             expires_at = (datetime.now(timezone.utc) + timedelta(days=payload.expires_in_days or 7)).isoformat()
             
-            raw_btn = (appl.get("button_text") or "Sponsored").strip()
-            slot_btn_label = raw_btn if raw_btn.startswith("[Ad]") else f"[Ad] {raw_btn}"
+            slot_btn_label = (appl.get("button_text") or "Sponsored").strip()
 
             supabase.table("promo_slots").upsert({
                 "slot_id": assigned_slot,
@@ -1628,8 +1612,7 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
             if uids and tg_application:
                 markup = None
                 if appl.get("button_text") and appl.get("destination_url"):
-                    raw_btn = appl["button_text"].strip()
-                    ad_btn_label = raw_btn if raw_btn.startswith("[Ad]") else f"[Ad] {raw_btn}"
+                    ad_btn_label = appl["button_text"].strip()
                     markup = InlineKeyboardMarkup([[InlineKeyboardButton(ad_btn_label, url=appl["destination_url"])]])
 
                 job_res = supabase.table("broadcast_jobs").insert({
@@ -1658,19 +1641,10 @@ async def handle_promotion_action(payload: PromotionActionPayload, background_ta
                             nonlocal delivered, blocked
                             try:
                                 if photo_id:
-                                    await tg_application.bot.send_photo(
-                                        chat_id=target_uid,
-                                        photo=photo_id,
-                                        caption=msg_text,
-                                        parse_mode="HTML",
-                                        reply_markup=reply_markup
-                                    )
+                                    await send_media_helper(tg_application.bot, target_uid, photo_id, msg_text, reply_markup)
                                 else:
                                     await tg_application.bot.send_message(
-                                        chat_id=target_uid,
-                                        text=msg_text,
-                                        parse_mode="HTML",
-                                        reply_markup=reply_markup
+                                        chat_id=target_uid, text=msg_text, parse_mode="HTML", reply_markup=reply_markup
                                     )
                                 delivered += 1
                             except Forbidden:
@@ -1866,6 +1840,9 @@ async def override_admin_channel(payload: ChannelOverridePayload):
             "approval_mode": payload.approval_mode or "instant",
             "promo_slots_enabled": payload.promo_slots_enabled if payload.promo_slots_enabled is not None else True
         }
+        if payload.vault_button_text is not None:
+            update_data["vault_button_text"] = payload.vault_button_text
+            
         supabase.table("channels").update(update_data).eq("chat_id", payload.target_chat_id).execute()
         return {"success": True, "message": "Channel updated."}
     except Exception as e:
@@ -2058,8 +2035,7 @@ async def update_promo_slots(payload: PromoSlotsUpdatePayload):
             if slot.expires_in_days and slot.expires_in_days > 0:
                 expires_at = (now_dt + timedelta(days=slot.expires_in_days)).isoformat()
 
-            raw_btn = slot.btn_text.strip()
-            slot_label = raw_btn if raw_btn.startswith("[Ad]") else f"[Ad] {raw_btn}"
+            slot_label = slot.btn_text.strip()
 
             update_data = {
                 "slot_id": slot.slot_id,
