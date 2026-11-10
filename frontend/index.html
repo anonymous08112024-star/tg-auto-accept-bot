@@ -184,6 +184,12 @@
             </button>
           </div>
 
+          <!-- NEW: Custom Vault Gate Text Input -->
+          <div id="vaultGateTextContainer" class="hidden pt-2 border-t border-slate-800">
+             <label class="block text-[10px] font-medium text-purple-400 mb-1">Gate Verification Button Text</label>
+             <input type="text" id="vaultBtnText" oninput="updatePreview()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500" placeholder="⚡ Activate VIP Pass & Channel Access">
+          </div>
+
           <!-- Explanation Note -->
           <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 text-[11px] text-slate-300 space-y-1.5 leading-relaxed">
             <p id="modeExplanationText">
@@ -201,7 +207,7 @@
             </div>
             <div class="flex items-center gap-2">
               <button id="setBannerBtn" class="text-[11px] font-semibold text-blue-400 hover:text-blue-300">
-                Attach Photo
+                Attach Media
               </button>
               <span class="text-slate-700">|</span>
               <button id="removeBannerBtn" class="text-[11px] font-semibold text-rose-400 hover:text-rose-300">
@@ -220,7 +226,7 @@
           <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 shadow-xl">
             <div class="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50 space-y-2.5">
               <div id="previewBannerBadge" class="hidden bg-blue-500/20 text-blue-300 text-[10px] px-2.5 py-1 rounded-md text-center font-semibold">
-                Photo Banner Attached
+                Media Banner Attached
               </div>
               <p class="text-xs font-semibold text-blue-400" id="previewTitle">Request Approved</p>
               <p class="text-xs text-slate-200 whitespace-pre-line leading-relaxed" id="previewMessage">Welcome to the channel.</p>
@@ -233,7 +239,7 @@
                   Secondary Button
                 </button>
                 <button disabled id="previewBtnSlot" class="w-full py-2 px-3 text-xs font-medium text-center bg-slate-800 text-slate-300 border border-slate-700 rounded-lg opacity-85 cursor-not-allowed truncate">
-                  [Ad] Sponsored Slot
+                  Sponsored Slot
                 </button>
               </div>
               <p class="text-[10px] text-slate-400 text-center font-medium">Auto-Approved via @AutoRequestAcceptorxBot</p>
@@ -386,14 +392,13 @@
           </div>
         </div>
 
-        <!-- CONDITIONAL BROADCAST SECTION: PHOTO ATTACHMENT PLACED FIRST -->
         <div id="promoBroadcastPhotoSection" class="hidden space-y-2 pt-1 border-t border-slate-800">
-          <label class="block text-[11px] font-semibold text-amber-400">Step 1: Broadcast Photo Attachment</label>
+          <label class="block text-[11px] font-semibold text-amber-400">Step 1: Broadcast Media Attachment</label>
           <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2 text-xs">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <span id="adPhotoIndicator" class="h-2 w-2 rounded-full bg-slate-600"></span>
-                <span id="adPhotoStatusText" class="text-slate-300">Photo: None attached</span>
+                <span id="adPhotoStatusText" class="text-slate-300">Media: None attached</span>
               </div>
               <div class="flex items-center gap-2">
                 <button type="button" onclick="attachAdPhoto()" class="text-[11px] font-semibold text-blue-400 hover:text-blue-300">
@@ -406,7 +411,7 @@
               </div>
             </div>
             <div id="adPhotoPreviewContainer" class="hidden pt-1">
-              <img id="adPhotoThumb" src="" alt="Ad Photo Preview" class="w-full h-32 object-cover rounded-lg border border-slate-800" onerror="this.classList.add('hidden')">
+              <img id="adPhotoThumb" src="" alt="Ad Media Preview" class="w-full h-32 object-cover rounded-lg border border-slate-800" onerror="this.classList.add('hidden')">
             </div>
           </div>
         </div>
@@ -424,10 +429,9 @@
         <div>
           <label class="block text-[11px] font-medium text-slate-400 mb-1">Inline Button Title</label>
           <input type="text" id="promoBtnText" oninput="savePromoDraftLocally()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="e.g. Join VIP Community">
-          <p class="text-[10px] text-slate-500 mt-1">Note: Clean <code class="text-amber-400">[Ad]</code> tag is automatically appended to ensure user trust.</p>
+          <p class="text-[10px] text-slate-500 mt-1">Note: Add an <code class="text-amber-400">[Ad]</code> tag manually if you wish to label this as sponsored.</p>
         </div>
 
-        <!-- Conditional Broadcast Message Body -->
         <div id="promoBroadcastMessageSection" class="hidden space-y-1.5 pt-1 border-t border-slate-800">
           <label class="block text-[11px] font-medium text-amber-400">Broadcast Message Body (HTML Supported)</label>
           <textarea id="promoBroadcastMessage" oninput="savePromoDraftLocally()" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500" placeholder="Enter message text to be delivered to subscribers' private DMs..."></textarea>
@@ -750,6 +754,10 @@
           </select>
         </div>
         <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Default VIP Gate Button Text</label>
+          <input type="text" id="defVaultBtnText" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500" placeholder="⚡ Activate VIP Pass & Channel Access">
+        </div>
+        <div>
           <label class="block text-[11px] font-medium text-slate-400 mb-1">Default Welcome Message</label>
           <textarea id="defCustomMsg" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"></textarea>
         </div>
@@ -764,7 +772,7 @@
           </div>
         </div>
         <div class="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-          <span class="text-amber-300 font-medium">Enable Promo Slot [Ad] by Default</span>
+          <span class="text-amber-300 font-medium">Enable Promo Slot Default</span>
           <input type="checkbox" id="defPromoSlots" class="accent-amber-500 h-4 w-4">
         </div>
         <div class="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
@@ -883,6 +891,8 @@
     const btnModeInstant = document.getElementById("btnModeInstant");
     const btnModeVaultGate = document.getElementById("btnModeVaultGate");
     const modeExplanationText = document.getElementById("modeExplanationText");
+    const vaultGateTextContainer = document.getElementById("vaultGateTextContainer");
+    const vaultBtnText = document.getElementById("vaultBtnText");
 
     const customMessage = document.getElementById("customMessage");
     const btn1Text = document.getElementById("btn1Text");
@@ -967,6 +977,7 @@
     const defaultsModal = document.getElementById("defaultsModal");
     const defApprovalMode = document.getElementById("defApprovalMode");
     const defCustomMsg = document.getElementById("defCustomMsg");
+    const defVaultBtnText = document.getElementById("defVaultBtnText");
     const defBtn1Text = document.getElementById("defBtn1Text");
     const defBtn1Url = document.getElementById("defBtn1Url");
     const defPromoSlots = document.getElementById("defPromoSlots");
@@ -1216,6 +1227,7 @@
       cJoinsTotal.innerText = currentChannel.subscriber_count || 0;
       cJoinsVerified.innerText = currentChannel.verified_subscribers || 0;
 
+      vaultBtnText.value = currentChannel.vault_button_text || "⚡ Activate VIP Pass & Channel Access";
       setApprovalMode(currentChannel.approval_mode || "instant", false);
 
       customMessage.value = currentChannel.custom_message || "Welcome to {channel}! Your access request has been approved.";
@@ -1241,10 +1253,12 @@
         btnModeInstant.className = "py-2.5 px-3 rounded-xl border border-blue-500/50 bg-blue-500/20 text-blue-300 text-xs font-semibold transition-all text-left";
         btnModeVaultGate.className = "py-2.5 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold transition-all text-left";
         modeExplanationText.innerHTML = "<b>Instant Pass (Default):</b> Users are approved instantly in under 50ms upon request. Frictionless entry for maximum subscriber velocity.";
+        vaultGateTextContainer.classList.add("hidden");
       } else {
         btnModeVaultGate.className = "py-2.5 px-3 rounded-xl border border-purple-500/50 bg-purple-500/20 text-purple-300 text-xs font-semibold transition-all text-left";
         btnModeInstant.className = "py-2.5 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold transition-all text-left";
-        modeExplanationText.innerHTML = "<b>Vault Gate (Ban-Protected):</b> Requests remain pending while delivering a branded access pass. Tapping <i>Claim VIP Pass</i> approves the user and establishes 100% permanent disaster-recovery reach.";
+        modeExplanationText.innerHTML = "<b>Vault Gate (Ban-Protected):</b> Requests remain pending while delivering a branded access pass. Tapping the button approves the user and establishes permanent reach.";
+        vaultGateTextContainer.classList.remove("hidden");
       }
       if (triggerPreview) updatePreview();
     };
@@ -1252,7 +1266,7 @@
     function updateBannerUI() {
       if (currentChannel.banner_file_id) {
         bannerIndicator.className = "h-2 w-2 rounded-full bg-emerald-400";
-        bannerStatusText.innerText = "Banner: Photo Active";
+        bannerStatusText.innerText = "Banner: Media Active";
         channelBannerThumb.src = `${BACKEND_URL}/api/media/preview/${currentChannel.banner_file_id}`;
         channelBannerPreviewContainer.classList.remove("hidden");
         previewBannerBadge.classList.remove("hidden");
@@ -1280,7 +1294,7 @@
       if (currentApprovalMode === "vault_gate") {
         previewTitle.innerText = `Access Verification: ${currentChannel.chat_title}`;
         previewMessage.innerText = `Hello ${user.first_name || 'there'}! Tap the button below to confirm your request and unlock entry to ${currentChannel.chat_title}.\n\n🛡️ This activates your disaster recovery backup channel insurance.`;
-        previewBtn1.innerText = "⚡ Claim VIP Pass & Enter Channel";
+        previewBtn1.innerText = vaultBtnText.value.trim() || "⚡ Activate VIP Pass & Channel Access";
         previewBtn2.classList.add("hidden");
         previewBtnSlot.classList.add("hidden");
         return;
@@ -1351,7 +1365,7 @@
     });
 
     removeBannerBtn.addEventListener("click", () => {
-      if (!currentChannel || !confirm("Remove photo banner and revert to clean text?")) return;
+      if (!currentChannel || !confirm("Remove media banner and revert to clean text?")) return;
       const botDeepLink = `https://t.me/AutoRequestAcceptorxBot?start=removebanner_${currentChannel.chat_id}`;
       if (tg && tg.openTelegramLink) {
         tg.openTelegramLink(botDeepLink);
@@ -1374,6 +1388,7 @@
         custom_btn_url: btn1Url.value.trim(),
         custom_btn_2_text: btn2Text.value.trim(),
         custom_btn_2_url: btn2Url.value.trim(),
+        vault_button_text: vaultBtnText.value.trim() || "⚡ Activate VIP Pass & Channel Access",
         event_mode_enabled: eventModeToggle.checked,
         event_message: eventMessage.value.trim(),
         silent_dm: silentDmToggle.checked,
@@ -1532,13 +1547,6 @@
       }
     };
 
-    window.copyMagicLink = () => {
-      mlResultInput.select();
-      document.execCommand("copy");
-      tg?.HapticFeedback?.notificationOccurred("success");
-      alert("Magic Link copied to clipboard.");
-    };
-
     // Promote Portal & Packages
     async function loadPromoPackages() {
       try {
@@ -1592,14 +1600,14 @@
         const data = await res.json();
         if (data.success && data.has_photo && data.banner_file_id) {
           adPhotoIndicator.className = "h-2 w-2 rounded-full bg-emerald-400";
-          adPhotoStatusText.innerText = "Photo: Attached";
+          adPhotoStatusText.innerText = "Media: Attached";
           adPhotoThumb.src = `${BACKEND_URL}/api/media/preview/${data.banner_file_id}`;
           adPhotoPreviewContainer.classList.remove("hidden");
           removeAdPhotoBtn.classList.remove("hidden");
           removeAdPhotoSeparator.classList.remove("hidden");
         } else {
           adPhotoIndicator.className = "h-2 w-2 rounded-full bg-slate-600";
-          adPhotoStatusText.innerText = "Photo: None attached";
+          adPhotoStatusText.innerText = "Media: None attached";
           adPhotoPreviewContainer.classList.add("hidden");
           removeAdPhotoBtn.classList.add("hidden");
           removeAdPhotoSeparator.classList.add("hidden");
@@ -1629,7 +1637,7 @@
         checkAdDraftPhoto();
         tg?.HapticFeedback?.notificationOccurred("success");
       } catch (e) {
-        alert("Failed to remove ad photo.");
+        alert("Failed to remove ad media.");
       }
     };
 
@@ -2230,7 +2238,7 @@
       }
     }
 
-    // Owner Audit Modal with Mode & Promo Slots Overrides
+    // Owner Audit Modal
     window.inspectAdmin = async function(targetAdminId) {
       inspectAdminTitle.innerText = `Admin ID: ${targetAdminId}`;
       inspectChannelsList.innerHTML = `<p class="text-slate-500 text-xs">Loading admin records...</p>`;
@@ -2268,12 +2276,17 @@
                 </select>
               </div>
               <div>
-                <label class="block text-[10px] font-medium text-slate-400 mb-0.5">Sponsored [Ad] Slot</label>
+                <label class="block text-[10px] font-medium text-slate-400 mb-0.5">Sponsored Slot Access</label>
                 <select id="ovSlots_${ch.chat_id}" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-white">
                   <option value="true" ${ch.promo_slots_enabled !== false ? 'selected' : ''}>Enabled (Ad visible)</option>
                   <option value="false" ${ch.promo_slots_enabled === false ? 'selected' : ''}>Disabled (No ads)</option>
                 </select>
               </div>
+            </div>
+
+            <div class="space-y-1.5 pt-1 border-t border-slate-800/80">
+               <label class="block text-[10px] font-medium text-slate-400">VIP Gate Button Text</label>
+               <input type="text" id="ovVaultBtn_${ch.chat_id}" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500" value="${ch.vault_button_text || '⚡ Activate VIP Pass & Channel Access'}">
             </div>
 
             <div class="space-y-1.5">
@@ -2284,11 +2297,11 @@
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[10px] font-medium text-slate-400">Button Title</label>
-                <input type="text" id="ovBtn1Text_${ch.chat_id}" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white" value="${ch.custom_btn_text || ''}">
+                <input type="text" id="ovBtn1Text_${ch.chat_id}" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500" value="${ch.custom_btn_text || ''}">
               </div>
               <div>
                 <label class="block text-[10px] font-medium text-slate-400">Button URL</label>
-                <input type="url" id="ovBtn1Url_${ch.chat_id}" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white" value="${ch.custom_btn_url || ''}">
+                <input type="url" id="ovBtn1Url_${ch.chat_id}" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500" value="${ch.custom_btn_url || ''}">
               </div>
             </div>
 
@@ -2317,6 +2330,7 @@
         custom_message: document.getElementById(`ovMsg_${chatId}`).value.trim(),
         custom_btn_text: document.getElementById(`ovBtn1Text_${chatId}`).value.trim(),
         custom_btn_url: document.getElementById(`ovBtn1Url_${chatId}`).value.trim(),
+        vault_button_text: document.getElementById(`ovVaultBtn_${chatId}`).value.trim(),
         is_active: document.getElementById(`ovActive_${chatId}`).checked,
         approval_mode: document.getElementById(`ovMode_${chatId}`).value,
         promo_slots_enabled: document.getElementById(`ovSlots_${chatId}`).value === "true"
@@ -2590,6 +2604,7 @@
         const data = await res.json();
         if (data.success && data.defaults) {
           defApprovalMode.value = data.defaults.approval_mode || "instant";
+          defVaultBtnText.value = data.defaults.vault_button_text || "⚡ Activate VIP Pass & Channel Access";
           defCustomMsg.value = data.defaults.custom_message || "";
           defBtn1Text.value = data.defaults.custom_btn_text || "";
           defBtn1Url.value = data.defaults.custom_btn_url || "";
@@ -2612,6 +2627,7 @@
         admin_id: user.id,
         defaults: {
           approval_mode: defApprovalMode.value,
+          vault_button_text: defVaultBtnText.value.trim() || "⚡ Activate VIP Pass & Channel Access",
           custom_message: defCustomMsg.value.trim(),
           custom_btn_text: defBtn1Text.value.trim(),
           custom_btn_url: defBtn1Url.value.trim(),
